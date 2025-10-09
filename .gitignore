@@ -1,0 +1,5 @@
+todo.txt
+poznamky.md
+
+uploads/*
+!uploads/.gitkeep
