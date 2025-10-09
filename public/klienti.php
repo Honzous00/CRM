@@ -131,7 +131,6 @@ if (isset($_GET['action']) && $_GET['action'] == 'delete' && isset($_GET['id']))
     }
 }
 
-
 // Získání všech klientů s podporou vyhledávání
 $klienti = [];
 $sql_klienti = "SELECT * FROM klienti";
@@ -190,14 +189,16 @@ if ($result_klienti->num_rows > 0) {
     <div class="bg-gray-50 p-4 rounded-md border border-gray-200 mb-6 flex justify-between items-center">
         <div>
             <h2 class="text-lg font-semibold text-gray-800">Filtry a vyhledávání</h2>
-            <?php if (!empty($search_query)): ?>
-                <p class="text-sm text-gray-500 mt-1">
-                    Vyhledávání: <span class="font-bold text-blue-600">"<?php echo htmlspecialchars($search_query); ?>"</span>
-                    (nalezeno: <span class="font-bold text-blue-600"><?php echo $count_results; ?></span>)
-                </p>
-            <?php endif; ?>
+            <div id="search-info">
+                <?php if (!empty($search_query)): ?>
+                    <p class="text-sm text-gray-500 mt-1">
+                        Vyhledávání: <span class="font-bold text-blue-600">"<?php echo htmlspecialchars($search_query); ?>"</span>
+                        (nalezeno: <span class="font-bold text-blue-600"><?php echo $count_results; ?></span>)
+                    </p>
+                <?php endif; ?>
+            </div>
         </div>
-        <form action="klienti.php" method="get" class="flex-grow max-w-sm ml-4">
+        <div class="flex-grow max-w-sm ml-4">
             <label for="search" class="sr-only">Vyhledávání klienta</label>
             <div class="relative">
                 <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -205,60 +206,72 @@ if ($result_klienti->num_rows > 0) {
                         <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
                     </svg>
                 </div>
-                <input type="text" name="search" id="search" class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Vyhledat klienta..." value="<?php echo htmlspecialchars($search_query); ?>">
+                <input type="text" id="search" class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Vyhledat klienta..." value="<?php echo htmlspecialchars($search_query); ?>">
             </div>
-        </form>
+        </div>
     </div>
 
     <div class="mt-8">
         <h2 class="text-xl font-semibold mb-4">Seznam klientů</h2>
-        <div class="overflow-x-auto bg-gray-50 rounded-md border border-gray-200 shadow-sm">
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-100">
-                    <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Jméno / Firma</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rodné č. / IČO</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Telefon</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trvalá adresa</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Korespond. adresa</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Akce</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
-                    <?php if (!empty($klienti)): ?>
-                        <?php foreach ($klienti as $klient): ?>
+        <div id="clients-table-container">
+            <div class="overflow-x-auto bg-gray-50 rounded-md border border-gray-200 shadow-sm">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-100">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Jméno / Firma</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rodné č. / IČO</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Telefon</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trvalá adresa</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Korespond. adresa</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Akce</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        <?php if (!empty($klienti)): ?>
+                            <?php foreach ($klienti as $klient): ?>
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($klient['jmeno']); ?></td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($klient['rc_ico']); ?></td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($klient['email']); ?></td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($klient['telefon']); ?></td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($klient['ulice'] . ', ' . $klient['mesto'] . ', ' . $klient['psc']); ?></td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                        <?php
+                                        // Zobrazí korespondenční adresu pouze pokud je jiná než trvalá
+                                        if ($klient['ulice'] !== $klient['korespondencni_ulice'] || $klient['mesto'] !== $klient['korespondencni_mesto'] || $klient['psc'] !== $klient['korespondencni_psc']) {
+                                            echo htmlspecialchars($klient['korespondencni_ulice'] . ', ' . $klient['korespondencni_mesto'] . ', ' . $klient['korespondencni_psc']);
+                                        } else {
+                                            echo 'shodná s trvalou';
+                                        }
+                                        ?>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                        <button onclick="openEditModal(<?php echo htmlspecialchars(json_encode($klient)); ?>)" class="text-blue-600 hover:text-blue-900 mr-2">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block mr-1" viewBox="0 0 20 20" fill="currentColor">
+                                                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                                            </svg>
+                                            Upravit
+                                        </button>
+                                        <a href="klienti.php?action=delete&id=<?php echo $klient['id']; ?>" onclick="return confirm('Opravdu chcete smazat tohoto klienta a všechny související smlouvy a provize?');" class="text-red-600 hover:text-red-900">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block mr-1" viewBox="0 0 20 20" fill="currentColor">
+                                                <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                                            </svg>
+                                            Smazat
+                                        </a>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php else: ?>
                             <tr>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($klient['jmeno']); ?></td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($klient['rc_ico']); ?></td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($klient['email']); ?></td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($klient['telefon']); ?></td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($klient['ulice'] . ', ' . $klient['mesto'] . ', ' . $klient['psc']); ?></td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                    <?php
-                                    // Zobrazí korespondenční adresu pouze pokud je jiná než trvalá
-                                    if ($klient['ulice'] !== $klient['korespondencni_ulice'] || $klient['mesto'] !== $klient['korespondencni_mesto'] || $klient['psc'] !== $klient['korespondencni_psc']) {
-                                        echo htmlspecialchars($klient['korespondencni_ulice'] . ', ' . $klient['korespondencni_mesto'] . ', ' . $klient['korespondencni_psc']);
-                                    } else {
-                                        echo 'shodná s trvalou';
-                                    }
-                                    ?>
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                    <button onclick="openEditModal(<?php echo htmlspecialchars(json_encode($klient)); ?>)" class="text-blue-600 hover:text-blue-900 mr-2">Upravit</button>
-                                    <a href="klienti.php?action=delete&id=<?php echo $klient['id']; ?>" onclick="return confirm('Opravdu chcete smazat tohoto klienta a všechny související smlouvy a provize?');" class="text-red-600 hover:text-red-900">Smazat</a>
+                                <td colspan="7" class="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-500">
+                                    Zatím nejsou přidáni žádní klienti.
                                 </td>
                             </tr>
-                        <?php endforeach; ?>
-                    <?php else: ?>
-                        <tr>
-                            <td colspan="7" class="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-500">
-                                Zatím nejsou přidáni žádní klienti.
-                            </td>
-                        </tr>
-                    <?php endif; ?>
-                </tbody>
-            </table>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 </div>
@@ -451,28 +464,84 @@ if ($result_klienti->num_rows > 0) {
 </div>
 
 <script>
+    // Real-time vyhledávání
     document.addEventListener('DOMContentLoaded', function() {
+        const searchInput = document.getElementById('search');
+        let searchTimeout;
+
+        searchInput.addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            const query = this.value.trim();
+
+            // Zobrazit indikátor načítání
+            const tableContainer = document.getElementById('clients-table-container');
+            tableContainer.innerHTML = '<div class="text-center py-4">Načítání...</div>';
+
+            searchTimeout = setTimeout(() => {
+                searchClients(query);
+            }, 300); // Zpoždění 300ms pro optimalizaci
+        });
+
+        function searchClients(query) {
+            const xhr = new XMLHttpRequest();
+            xhr.open('GET', 'search_klienti.php?search=' + encodeURIComponent(query), true);
+
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    document.getElementById('clients-table-container').innerHTML = xhr.responseText;
+
+                    // Aktualizovat informace o vyhledávání
+                    const searchInfo = document.getElementById('search-info');
+                    const resultCount = document.querySelectorAll('#clients-table-container tbody tr').length - 1; // Odečteme řádek s "žádní klienti"
+
+                    if (query) {
+                        searchInfo.innerHTML = `
+                            <p class="text-sm text-gray-500 mt-1">
+                                Vyhledávání: <span class="font-bold text-blue-600">"${query}"</span>
+                                (nalezeno: <span class="font-bold text-blue-600">${resultCount}</span>)
+                            </p>
+                        `;
+                    } else {
+                        searchInfo.innerHTML = '';
+                    }
+                } else {
+                    document.getElementById('clients-table-container').innerHTML = '<div class="text-center py-4 text-red-500">Chyba při načítání dat.</div>';
+                }
+            };
+
+            xhr.onerror = function() {
+                document.getElementById('clients-table-container').innerHTML = '<div class="text-center py-4 text-red-500">Chyba připojení k serveru.</div>';
+            };
+
+            xhr.send();
+        }
+
+        // Původní kód pro správu modálních oken
         const jinaAdresaCheckbox = document.getElementById('jina_adresa');
         const korespondencniAdresaFields = document.getElementById('korespondencni-adresa-fields');
 
-        jinaAdresaCheckbox.addEventListener('change', function() {
-            if (this.checked) {
-                korespondencniAdresaFields.classList.remove('hidden');
-            } else {
-                korespondencniAdresaFields.classList.add('hidden');
-            }
-        });
+        if (jinaAdresaCheckbox) {
+            jinaAdresaCheckbox.addEventListener('change', function() {
+                if (this.checked) {
+                    korespondencniAdresaFields.classList.remove('hidden');
+                } else {
+                    korespondencniAdresaFields.classList.add('hidden');
+                }
+            });
+        }
 
         const editJinaAdresaCheckbox = document.getElementById('edit-jina_adresa');
         const editKorespondencniAdresaFields = document.getElementById('edit-korespondencni-adresa-fields');
 
-        editJinaAdresaCheckbox.addEventListener('change', function() {
-            if (this.checked) {
-                editKorespondencniAdresaFields.classList.remove('hidden');
-            } else {
-                editKorespondencniAdresaFields.classList.add('hidden');
-            }
-        });
+        if (editJinaAdresaCheckbox) {
+            editJinaAdresaCheckbox.addEventListener('change', function() {
+                if (this.checked) {
+                    editKorespondencniAdresaFields.classList.remove('hidden');
+                } else {
+                    editKorespondencniAdresaFields.classList.add('hidden');
+                }
+            });
+        }
     });
 
     function openAddModal() {

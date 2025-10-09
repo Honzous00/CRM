@@ -48,11 +48,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <?php endif; ?>
         <form action="login.php" method="post" class="space-y-4">
             <div>
-                <label for="username" class="block text-sm font-medium text-gray-700">Uživatelské jméno</label>
+                <label for="username" class="block text-sm font-medium text-gray-700">Uživatelské jméno (admin)</label>
                 <input type="text" id="username" name="username" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2">
             </div>
             <div>
-                <label for="password" class="block text-sm font-medium text-gray-700">Heslo</label>
+                <label for="password" class="block text-sm font-medium text-gray-700">Heslo (heslo123)</label>
                 <input type="password" id="password" name="password" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2">
             </div>
             <button type="submit" class="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200">
