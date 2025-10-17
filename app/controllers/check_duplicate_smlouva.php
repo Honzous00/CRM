@@ -1,5 +1,5 @@
 <?php
-include_once __DIR__ . '/../app/includes/db_connect.php';
+include_once __DIR__ . '/../includes/db_connect.php';
 
 header('Content-Type: application/json');
 

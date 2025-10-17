@@ -493,13 +493,6 @@ $count_results = $result_provize->num_rows;
             loadSmlouvaDetails(this.value);
         });
 
-        // Zavření modálního okna při kliknutí mimo něj
-        window.addEventListener('click', function(event) {
-            if (event.target === modal) {
-                modal.classList.add('hidden');
-            }
-        });
-
         // Připojit event listenery pro stávající řádky
         attachEventListeners();
     });

@@ -1,5 +1,7 @@
 todo.txt
-poznamky.md
-
+Poznámky.md
+.todo
+testing/
+backup/
 uploads/*
 !uploads/.gitkeep

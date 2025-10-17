@@ -7,326 +7,37 @@ require_login();
 include_once __DIR__ . '/../app/includes/header.php';
 include_once __DIR__ . '/../app/includes/db_connect.php';
 
-// Definice proměnných pro zprávy (úspěch/chyba)
-$message = '';
-$message_type = '';
+// Načtení controllerů a view
+include_once __DIR__ . '/../app/controllers/smlouvy_controller.php';
+include_once __DIR__ . '/../app/views/smlouvy_view.php';
+include_once __DIR__ . '/../app/views/smlouvy_form.php';
+include_once __DIR__ . '/../app/views/smlouvy_documents.php';
+include_once __DIR__ . '/../app/models/dokumenty_model.php';
 
-// --- ZPRACOVÁNÍ VYHLEDÁVÁNÍ ---
-$search_query = '';
-$count_results = 0;
+// Vytvoření instance controlleru
+$controller = new SmlouvyController($conn);
 
-if (isset($_GET['search']) && !empty($_GET['search'])) {
-    $search_query = $conn->real_escape_string($_GET['search']);
-}
+// Zpracování požadavku
+$controller->handleRequest();
 
-// --- PHP LOGIKA PRO ÚPRAVU A SMAZÁNÍ SMLUV ---
-
-// Zpracování smazání smlouvy
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_id'])) {
-    $delete_id = $_POST['delete_id'];
-
-    // Použití prepared statement pro bezpečné smazání
-    $stmt_delete = $conn->prepare("DELETE FROM smlouvy WHERE id = ?");
-    $stmt_delete->bind_param("i", $delete_id);
-
-    if ($stmt_delete->execute()) {
-        $message = "Smlouva byla úspěšně smazána.";
-        $message_type = "success";
-    } else {
-        $message = "Chyba při mazání smlouvy: " . $stmt_delete->error;
-        $message_type = "error";
-    }
-    $stmt_delete->close();
-}
-
-// Zpracování úpravy smlouvy
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_id'])) {
-    $update_id = $_POST['update_id'];
-
-    // Získání a ošetření dat z formuláře
-    $klient_id = $conn->real_escape_string($_POST['klient_id']);
-    $cislo_smlouvy = $conn->real_escape_string($_POST['cislo_smlouvy']);
-    $produkt_id = $conn->real_escape_string($_POST['produkt_id']);
-    $pojistovna_id = $conn->real_escape_string($_POST['pojistovna_id']);
-    $datum_sjednani = $conn->real_escape_string($_POST['datum_sjednani']);
-    $datum_platnosti = $conn->real_escape_string($_POST['datum_platnosti']);
-    $zaznam_zeteo = isset($_POST['zaznam_zeteo']) ? 1 : 0;
-    $poznamka = $conn->real_escape_string($_POST['poznamka']);
-
-    $cesta_k_souboru = $_POST['stara_cesta_k_souboru'];
-
-    // Zpracování nahrání nového souboru (pokud je nahrán)
-    if (isset($_FILES['soubor']) && $_FILES['soubor']['error'] == UPLOAD_ERR_OK) {
-        $file_tmp_path = $_FILES['soubor']['tmp_name'];
-        $file_name = $_FILES['soubor']['name'];
-        $file_ext = strtolower(pathinfo($file_name, PATHINFO_EXTENSION));
-        $allowed_ext = ['pdf'];
-
-        if (in_array($file_ext, $allowed_ext)) {
-            $new_file_name = uniqid('smlouva_', true) . '.' . $file_ext;
-            $upload_path = __DIR__ . '/uploads/' . $new_file_name;
-            if (move_uploaded_file($file_tmp_path, $upload_path)) {
-                $cesta_k_souboru = 'uploads/' . $new_file_name;
-            } else {
-                $message = "Chyba při nahrávání souboru.";
-                $message_type = "error";
-            }
-        } else {
-            $message = "Nahráný soubor není povolený typ (pouze PDF).";
-            $message_type = "error";
-        }
-    }
-
-    // Zpracování dynamických podmínek a uložení do JSON
-    $podminky_produktu = [];
-    switch ($produkt_id) {
-        case 11: // Životní pojištění
-            switch ($pojistovna_id) {
-                case 1:
-                    $podminky_produktu['typ'] = 'Allianz';
-                    $podminky_produktu['podtyp'] = $_POST['podtyp_allianz'] ?? '';
-                    break;
-                case 2:
-                    $podminky_produktu['typ'] = 'ČPP';
-                    $podminky_produktu['podtyp'] = $_POST['podtyp_cpp'] ?? '';
-                    break;
-                case 3:
-                    $podminky_produktu['typ'] = 'Kooperativa';
-                    $podminky_produktu['podtyp'] = $_POST['podtyp_kooperativa'] ?? '';
-                    break;
-                case 4:
-                    $podminky_produktu['typ'] = 'Maxima';
-                    $podminky_produktu['podtyp'] = $_POST['podtyp_maxima'] ?? '';
-                    break;
-            }
-            $podminky_produktu['dip'] = isset($_POST['dip']) ? 'Ano' : 'Ne';
-            $podminky_produktu['detske'] = isset($_POST['detske']) ? 'Ano' : 'Ne';
-            break;
-        case 2: // Cestovní pojištění
-            $podminky_produktu['zacatek'] = $_POST['cestovni_zacatek'] ?? '';
-            $podminky_produktu['konec'] = $_POST['cestovni_konec'] ?? '';
-            break;
-        case 1: // Autopojištění
-            $podminky_produktu['pov'] = isset($_POST['pov']) ? 'Ano' : 'Ne';
-            $podminky_produktu['hav'] = isset($_POST['hav']) ? 'Ano' : 'Ne';
-            $podminky_produktu['dalsi_pripojisteni'] = $_POST['dalsi_pripojisteni'] ?? '';
-            break;
-        case 8: // Pojištění nemovitosti
-            $podminky_produktu['domacnost'] = isset($_POST['nemovitost_domacnost']) ? 'Ano' : 'Ne';
-            $podminky_produktu['stavba'] = isset($_POST['nemovitost_stavba']) ? 'Ano' : 'Ne';
-            $podminky_produktu['odpovednost'] = isset($_POST['nemovitost_odpovednost']) ? 'Ano' : 'Ne';
-            $podminky_produktu['asistence'] = isset($_POST['nemovitost_asistence']) ? 'Ano' : 'Ne';
-            $podminky_produktu['nop'] = isset($_POST['nemovitost_nop']) ? 'Ano' : 'Ne';
-            $podminky_produktu['nop_poznamka'] = $_POST['nemovitost_nop_poznamka'] ?? '';
-            break;
-    }
-    $json_podminky = json_encode($podminky_produktu);
-
-    if ($message_type !== 'error') {
-        // Použití prepared statement pro bezpečný update
-        $stmt_update = $conn->prepare("UPDATE smlouvy SET klient_id=?, cislo_smlouvy=?, produkt_id=?, pojistovna_id=?, datum_sjednani=?, datum_platnosti=?, zaznam_zeteo=?, poznamka=?, podminky_produktu=?, cesta_k_souboru=? WHERE id=?");
-        $stmt_update->bind_param("isssssisssi", $klient_id, $cislo_smlouvy, $produkt_id, $pojistovna_id, $datum_sjednani, $datum_platnosti, $zaznam_zeteo, $poznamka, $json_podminky, $cesta_k_souboru, $update_id);
-
-        if ($stmt_update->execute()) {
-            $message = "Smlouva byla úspěšně aktualizována.";
-            $message_type = "success";
-            header("Location: smlouvy.php");
-            exit;
-        } else {
-            $message = "Chyba při aktualizaci smlouvy: " . $stmt_update->error;
-            $message_type = "error";
-        }
-        $stmt_update->close();
-    }
-}
-
-// Zpracování dat z formuláře po odeslání (původní logika pro přidání smlouvy)
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['update_id']) && !isset($_POST['delete_id'])) {
-    $klient_id = $conn->real_escape_string($_POST['klient_id']);
-    $cislo_smlouvy = $conn->real_escape_string($_POST['cislo_smlouvy']);
-    $produkt_id = $conn->real_escape_string($_POST['produkt_id']);
-    $pojistovna_id = $conn->real_escape_string($_POST['pojistovna_id']);
-    $datum_sjednani = $conn->real_escape_string($_POST['datum_sjednani']);
-    $datum_platnosti = $conn->real_escape_string($_POST['datum_platnosti']);
-    $zaznam_zeteo = isset($_POST['zaznam_zeteo']) ? 1 : 0;
-    $poznamka = $conn->real_escape_string($_POST['poznamka']);
-    $cesta_k_souboru = '';
-
-
-
-    if (empty($validation_errors)) {
-        $stmt_check = $conn->prepare("SELECT id FROM smlouvy WHERE cislo_smlouvy = ?");
-        $stmt_check->bind_param("s", $cislo_smlouvy);
-        $stmt_check->execute();
-        $result_check = $stmt_check->get_result();
-
-        if ($result_check->num_rows > 0) {
-            $validation_errors[] = "Smlouva s číslem '" . htmlspecialchars($cislo_smlouvy) . "' již existuje v databázi.";
-        }
-    }
-
-    if (!empty($validation_errors)) {
-        $message = "Chyba: " . implode(" ", $validation_errors);
-        $message_type = "error";
-    } else {
-        // Zbytek zpracování souboru a vložení do DB zůstává stejný
-        if (isset($_FILES['soubor']) && $_FILES['soubor']['error'] == UPLOAD_ERR_OK) {
-            $file_tmp_path = $_FILES['soubor']['tmp_name'];
-            $file_name = $_FILES['soubor']['name'];
-            $file_ext = strtolower(pathinfo($file_name, PATHINFO_EXTENSION));
-            $allowed_ext = ['pdf'];
-            if (in_array($file_ext, $allowed_ext)) {
-                $new_file_name = uniqid('smlouva_', true) . '.' . $file_ext;
-                $upload_path = __DIR__ . '/uploads/' . $new_file_name;
-                if (move_uploaded_file($file_tmp_path, $upload_path)) {
-                    $cesta_k_souboru = 'uploads/' . $new_file_name;
-                } else {
-                    $message = "Chyba při přesouvání souboru na server.";
-                    $message_type = "error";
-                }
-            } else {
-                $message = "Nahráný soubor není povolený typ (povolené jsou pouze PDF).";
-                $message_type = "error";
-            }
-        }
-    }
-
-    $podminky_produktu = [];
-    switch ($produkt_id) {
-        case 1:
-            switch ($pojistovna_id) {
-                case 6:
-                    $podminky_produktu['typ'] = 'ČPP';
-                    $podminky_produktu['podtyp'] = $_POST['podtyp_cpp'] ?? '';
-                    break;
-                case 7:
-                    $podminky_produktu['typ'] = 'Kooperativa';
-                    $podminky_produktu['podtyp'] = $_POST['podtyp_kooperativa'] ?? '';
-                    break;
-                case 8:
-                    $podminky_produktu['typ'] = 'Allianz';
-                    $podminky_produktu['podtyp'] = $_POST['podtyp_allianz'] ?? '';
-                    break;
-                case 9:
-                    $podminky_produktu['typ'] = 'Maxima';
-                    $podminky_produktu['podtyp'] = $_POST['podtyp_maxima'] ?? '';
-                    break;
-            }
-            $podminky_produktu['dip'] = isset($_POST['dip']) ? 'Ano' : 'Ne';
-            $podminky_produktu['detske'] = isset($_POST['detske']) ? 'Ano' : 'Ne';
-            break;
-        case 2:
-            $podminky_produktu['zacatek'] = $_POST['cestovni_zacatek'] ?? '';
-            $podminky_produktu['konec'] = $_POST['cestovni_konec'] ?? '';
-            break;
-        case 6:
-            $podminky_produktu['pov'] = isset($_POST['pov']) ? 'Ano' : 'Ne';
-            $podminky_produktu['hav'] = isset($_POST['hav']) ? 'Ano' : 'Ne';
-            $podminky_produktu['dalsi_pripojisteni'] = $_POST['dalsi_pripojisteni'] ?? '';
-            break;
-        case 7:
-            $podminky_produktu['domacnost'] = isset($_POST['nemovitost_domacnost']) ? 'Ano' : 'Ne';
-            $podminky_produktu['stavba'] = isset($_POST['nemovitost_stavba']) ? 'Ano' : 'Ne';
-            $podminky_produktu['odpovednost'] = isset($_POST['nemovitost_odpovednost']) ? 'Ano' : 'Ne';
-            $podminky_produktu['asistence'] = isset($_POST['nemovitost_asistence']) ? 'Ano' : 'Ne';
-            $podminky_produktu['nop'] = isset($_POST['nemovitost_nop']) ? 'Ano' : 'Ne';
-            $podminky_produktu['nop_poznamka'] = $_POST['nemovitost_nop_poznamka'] ?? '';
-            break;
-    }
-    $json_podminky = json_encode($podminky_produktu);
-
-    if ($message_type !== 'error') {
-        $stmt_insert = $conn->prepare("INSERT INTO smlouvy (klient_id, cislo_smlouvy, produkt_id, pojistovna_id, datum_sjednani, datum_platnosti, zaznam_zeteo, poznamka, podminky_produktu, cesta_k_souboru) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmt_insert->bind_param("isssssisss", $klient_id, $cislo_smlouvy, $produkt_id, $pojistovna_id, $datum_sjednani, $datum_platnosti, $zaznam_zeteo, $poznamka, $json_podminky, $cesta_k_souboru);
-        if ($stmt_insert->execute()) {
-            $message = "Smlouva byla úspěšně přidána.";
-            $message_type = "success";
-            header("Location: smlouvy.php");
-            exit;
-        } else {
-            $message = "Chyba při přidávání smlouvy: " . $stmt_insert->error;
-            $message_type = "error";
-        }
-    }
-}
-
-// Získání seznamu klientů, produktů a pojišťoven
-$klienti = [];
-$produkty = [];
-$pojistovny = [];
-$sql_klienti = "SELECT id, jmeno FROM klienti ORDER BY jmeno ASC";
-$result_klienti = $conn->query($sql_klienti);
-if ($result_klienti->num_rows > 0) {
-    while ($row = $result_klienti->fetch_assoc()) {
-        $klienti[] = $row;
-    }
-}
-$sql_produkty = "SELECT id, nazev FROM produkty ORDER BY nazev ASC";
-$result_produkty = $conn->query($sql_produkty);
-if ($result_produkty->num_rows > 0) {
-    while ($row = $result_produkty->fetch_assoc()) {
-        $produkty[] = $row;
-    }
-}
-$sql_pojistovny = "SELECT id, nazev FROM pojistovny ORDER BY nazev ASC";
-$result_pojistovny = $conn->query($sql_pojistovny);
-if ($result_pojistovny->num_rows > 0) {
-    while ($row = $result_pojistovny->fetch_assoc()) {
-        $pojistovny[] = $row;
-    }
-}
-
-// Získání seznamu všech smluv s informacemi o klientovi, produktu a pojišťovně
-$sql_smlouvy = "
-    SELECT
-        smlouvy.id,
-        smlouvy.cislo_smlouvy,
-        smlouvy.cesta_k_souboru,
-        smlouvy.datum_vytvoreni,
-        smlouvy.datum_sjednani,
-        smlouvy.datum_platnosti,
-        smlouvy.zaznam_zeteo,
-        smlouvy.poznamka,
-        smlouvy.podminky_produktu,
-        smlouvy.klient_id,
-        smlouvy.produkt_id,
-        smlouvy.pojistovna_id,
-        klienti.jmeno AS jmeno_klienta,
-        produkty.nazev AS nazev_produktu,
-        pojistovny.nazev AS nazev_pojistovny
-    FROM smlouvy
-    LEFT JOIN klienti ON smlouvy.klient_id = klienti.id
-    LEFT JOIN produkty ON smlouvy.produkt_id = produkty.id
-    LEFT JOIN pojistovny ON smlouvy.pojistovna_id = pojistovny.id
-";
-
-// Přidání podmínky pro vyhledávání, pokud je zadán vyhledávací dotaz
-if (!empty($search_query)) {
-    $sql_smlouvy .= " WHERE 
-        smlouvy.cislo_smlouvy LIKE '%$search_query%' OR 
-        klienti.jmeno LIKE '%$search_query%' OR 
-        produkty.nazev LIKE '%$search_query%' OR 
-        pojistovny.nazev LIKE '%$search_query%' OR 
-        smlouvy.poznamka LIKE '%$search_query%'";
-}
-
-$sql_smlouvy .= " ORDER BY smlouvy.datum_sjednani DESC";
-
-$result_smlouvy = $conn->query($sql_smlouvy);
-$count_results = $result_smlouvy->num_rows;
+// Získání dat pro zobrazení
+$klienti = $controller->getKlienti();
+$produkty = $controller->getProdukty();
+$pojistovny = $controller->getPojistovny();
+$smlouvy = $controller->getSmlouvy($_GET['search'] ?? '');
 ?>
 
 <div class="container mx-auto mt-8 p-6 bg-white rounded-lg shadow-lg">
     <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">Správa smluv</h1>
 
-    <!-- Zobrazení zpráv (úspěch/chyba) -->
-    <?php if ($message): ?>
-        <div class="p-4 mb-4 rounded-md <?php echo $message_type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'; ?>">
-            <?php echo htmlspecialchars($message); ?>
+    <!-- Zobrazení zpráv -->
+    <?php if ($controller->hasMessage()): ?>
+        <div class="p-4 mb-4 rounded-md <?php echo $controller->getMessageType() === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'; ?>">
+            <?php echo htmlspecialchars($controller->getMessage()); ?>
         </div>
     <?php endif; ?>
 
-    <!-- Tlačítko pro otevření modálního okna pro přidání smlouvy -->
+    <!-- Zbytek kódu zůstává podobný, jen voláme naše nové funkce -->
     <div class="flex justify-end mb-4">
         <button id="open-add-modal-btn" class="py-2 px-4 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors duration-200">
             Přidat novou smlouvu
@@ -337,10 +48,10 @@ $count_results = $result_smlouvy->num_rows;
     <div class="bg-gray-50 p-4 rounded-md border border-gray-200 mb-6 flex justify-between items-center">
         <div id="search-info">
             <h2 class="text-lg font-semibold text-gray-800">Filtry a vyhledávání</h2>
-            <?php if (!empty($search_query)): ?>
+            <?php if (!empty($_GET['search'])): ?>
                 <p class="text-sm text-gray-500 mt-1">
-                    Vyhledávání: <span class="font-bold text-blue-600">"<?php echo htmlspecialchars($search_query); ?>"</span>
-                    (nalezeno: <span class="font-bold text-blue-600"><?php echo $count_results; ?></span>)
+                    Vyhledávání: <span class="font-bold text-blue-600">"<?php echo htmlspecialchars($_GET['search']); ?>"</span>
+                    (nalezeno: <span class="font-bold text-blue-600"><?php echo count($smlouvy); ?></span>)
                 </p>
             <?php endif; ?>
         </div>
@@ -352,7 +63,7 @@ $count_results = $result_smlouvy->num_rows;
                         <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"></path>
                     </svg>
                 </div>
-                <input type="text" name="search" id="search" class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Vyhledat smlouvu..." value="<?php echo htmlspecialchars($search_query); ?>">
+                <input type="text" name="search" id="search" class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Vyhledat smlouvu..." value="<?php echo htmlspecialchars($_GET['search'] ?? ''); ?>">
             </div>
         </form>
     </div>
@@ -361,959 +72,666 @@ $count_results = $result_smlouvy->num_rows;
     <div class="mt-8">
         <h2 class="text-xl font-semibold mb-4">Seznam smluv</h2>
         <div id="contracts-table-container">
-            <?php if ($result_smlouvy->num_rows > 0): ?>
-                <div class="overflow-x-auto bg-gray-50 rounded-md border border-gray-200 shadow-sm">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-100">
-                            <tr>
-                                <!-- <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th> -->
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Klient</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Číslo smlouvy</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Produkt</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pojišťovna</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sjednáno</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Počátek platnosti</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Specifika</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Zeteo</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Soubor</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Poznámka</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vytvořeno</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Akce</th>
-                            </tr>
-                        </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
-                            <?php while ($row = $result_smlouvy->fetch_assoc()): ?>
-                                <tr class="hover:bg-gray-100 transition-colors"
-                                    data-id="<?php echo htmlspecialchars($row['id']); ?>"
-                                    data-klient-id="<?php echo htmlspecialchars($row['klient_id']); ?>"
-                                    data-cislo-smlouvy="<?php echo htmlspecialchars($row['cislo_smlouvy']); ?>"
-                                    data-produkt-id="<?php echo htmlspecialchars($row['produkt_id']); ?>"
-                                    data-pojistovna-id="<?php echo htmlspecialchars($row['pojistovna_id']); ?>"
-                                    data-datum-sjednani="<?php echo htmlspecialchars($row['datum_sjednani']); ?>"
-                                    data-datum-platnosti="<?php echo htmlspecialchars($row['datum_platnosti']); ?>"
-                                    data-zaznam-zeteo="<?php echo $row['zaznam_zeteo']; ?>"
-                                    data-poznamka="<?php echo htmlspecialchars($row['poznamka']); ?>"
-                                    data-cesta-k-souboru="<?php echo htmlspecialchars($row['cesta_k_souboru']); ?>"
-                                    data-podminky-produktu="<?php echo htmlspecialchars($row['podminky_produktu']); ?>">
-                                    <!-- <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"></?php echo htmlspecialchars($row['id']); ?></td> -->
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($row['jmeno_klienta']); ?></td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($row['cislo_smlouvy']); ?></td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($row['nazev_produktu']); ?></td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($row['nazev_pojistovny']); ?></td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($row['datum_sjednani']); ?></td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($row['datum_platnosti']); ?></td>
-                                    <td class="px-6 py-4 text-sm text-gray-900">
-                                        <?php
-                                        if ($row['podminky_produktu']) {
-                                            $podminky = json_decode($row['podminky_produktu'], true);
-                                            foreach ($podminky as $klic => $hodnota) {
-                                                echo '<strong>' . htmlspecialchars($klic) . ':</strong> ' . htmlspecialchars($hodnota) . '<br>';
-                                            }
-                                        }
-                                        ?>
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-center">
-                                        <?php echo $row['zaznam_zeteo'] ? '&#x2714;' : '&#x2718;'; ?>
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                        <?php if (!empty($row['cesta_k_souboru'])): ?>
-                                            <a href="<?php echo htmlspecialchars($row['cesta_k_souboru']); ?>" target="_blank" class="text-blue-600 hover:text-blue-800 transition-colors duration-200">
-                                                Stáhnout PDF
-                                            </a>
-                                        <?php else: ?>
-                                            N/A
-                                        <?php endif; ?>
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($row['poznamka']); ?></td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><?php echo date('d.m.Y', strtotime($row['datum_vytvoreni'])); ?></td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                        <button class="edit-btn text-indigo-600 hover:text-indigo-900 transition-colors duration-200" title="Upravit">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block mr-1" viewBox="0 0 20 20" fill="currentColor">
-                                                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                                            </svg>
-                                            Upravit
-                                        </button>
-                                        <form method="post" action="smlouvy.php" class="inline-block delete-form ml-2"
-                                            data-confirm="Opravdu chcete smazat smlouvu č. <?php echo htmlspecialchars($row['cislo_smlouvy']); ?> klienta <?php echo htmlspecialchars($row['jmeno_klienta']); ?>?">
-                                            <input type="hidden" name="delete_id" value="<?php echo htmlspecialchars($row['id']); ?>">
-                                            <button type="submit" class="text-red-600 hover:text-red-900 transition-colors duration-200" title="Smazat">
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block mr-1" viewBox="0 0 20 20" fill="currentColor">
-                                                    <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
-                                                </svg>
-                                                Smazat
-                                            </button>
-                                        </form>
-                                    </td>
-                                </tr>
-                            <?php endwhile; ?>
-                        </tbody>
-                    </table>
-                </div>
-            <?php else: ?>
-                <p class="text-gray-500">Zatím nejsou přidány žádné smlouvy.</p>
-            <?php endif; ?>
-        </div>
-    </div>
-
-    <!-- Modální okno pro přidání smlouvy -->
-    <div id="add-modal" class="hidden fixed inset-0 z-50 overflow-auto bg-gray-800 bg-opacity-75 flex items-center justify-center">
-        <div class="bg-white rounded-lg p-6 w-full max-w-2xl mx-auto my-12 shadow-lg">
-            <div class="flex justify-between items-center pb-3">
-                <h2 class="text-2xl font-semibold text-gray-800">Přidat novou smlouvu</h2>
-                <button id="close-add-modal-btn" class="text-gray-500 hover:text-gray-700">
-                    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                    </svg>
-                </button>
-            </div>
-            <form action="" method="post" enctype="multipart/form-data" id="add-smlouva-form">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div class="mb-4">
-                        <label for="klient_id" class="block text-sm font-medium text-gray-700">Klient</label>
-                        <select id="klient_id" name="klient_id" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2">
-                            <?php if (empty($klienti)): ?>
-                                <option value="" disabled selected>Nejsou k dispozici žádní klienti</option>
-                            <?php else: ?>
-                                <?php foreach ($klienti as $klient): ?>
-                                    <option value="<?php echo htmlspecialchars($klient['id']); ?>">
-                                        <?php echo htmlspecialchars($klient['jmeno']); ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            <?php endif; ?>
-                        </select>
-                    </div>
-                    <div class="mb-4">
-                        <label for="cislo_smlouvy" class="block text-sm font-medium text-gray-700">Číslo smlouvy *</label>
-                        <input type="text" id="cislo_smlouvy" name="cislo_smlouvy" required
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2 validation-field">
-                        <div id="cislo_smlouvy_error" class="text-red-500 text-sm mt-1 hidden"></div>
-                    </div>
-                    <div class="mb-4">
-                        <label for="produkt_id" class="block text-sm font-medium text-gray-700">Typ produktu</label>
-                        <select id="produkt_id" name="produkt_id" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2">
-                            <?php if (empty($produkty)): ?>
-                                <option value="" disabled selected>Nejsou k dispozici žádné produkty</option>
-                            <?php else: ?>
-                                <?php foreach ($produkty as $produkt): ?>
-                                    <option value="<?php echo htmlspecialchars($produkt['id']); ?>">
-                                        <?php echo htmlspecialchars($produkt['nazev']); ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            <?php endif; ?>
-                        </select>
-                    </div>
-                    <div class="mb-4">
-                        <label for="pojistovna_id" class="block text-sm font-medium text-gray-700">Pojišťovna/Instituce</label>
-                        <select id="pojistovna_id" name="pojistovna_id" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2">
-                            <?php if (empty($pojistovny)): ?>
-                                <option value="" disabled selected>Nejsou k dispozici žádné pojišťovny</option>
-                            <?php else: ?>
-                                <?php foreach ($pojistovny as $pojistovna): ?>
-                                    <option value="<?php echo htmlspecialchars($pojistovna['id']); ?>">
-                                        <?php echo htmlspecialchars($pojistovna['nazev']); ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            <?php endif; ?>
-                        </select>
-                    </div>
-                    <div class="mb-4">
-                        <label for="datum_sjednani" class="block text-sm font-medium text-gray-700">Datum sjednání *</label>
-                        <input type="date" id="datum_sjednani" name="datum_sjednani" required
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2 validation-field">
-                        <div id="datum_sjednani_error" class="text-red-500 text-sm mt-1 hidden"></div>
-                    </div>
-                    <div class="mb-4">
-                        <label for="datum_platnosti" class="block text-sm font-medium text-gray-700">Datum počátku smlouvy *</label>
-                        <input type="date" id="datum_platnosti" name="datum_platnosti" required
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2 validation-field">
-                        <div id="datum_platnosti_error" class="text-red-500 text-sm mt-1 hidden"></div>
-                    </div>
-                </div>
-
-                <!-- Dynamicky vkládané podmínky -->
-                <div id="dynamic-fields" class="mt-4 border-t pt-4 border-gray-200">
-                    <!-- Životní pojištění -->
-                    <div id="zivotni_pojisteni_fields" data-product-id="11" class="hidden">
-                        <div id="zivotni_cpp_fields" data-pojistovna-id="2" class="hidden">
-                            <div class="mb-4">
-                                <label for="podtyp_cpp" class="block text-sm font-medium text-gray-700">Podtyp ČPP</label>
-                                <select id="podtyp_cpp" name="podtyp_cpp" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2">
-                                    <option value="">Vyberte podtyp</option>
-                                    <option value="RISK">RISK</option>
-                                    <option value="Life">Life</option>
-                                    <option value="Invest">Invest</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div id="zivotni_kooperativa_fields" data-pojistovna-id="3" class="hidden">
-                            <div class="mb-4">
-                                <label for="podtyp_kooperativa" class="block text-sm font-medium text-gray-700">Podtyp Kooperativa</label>
-                                <select id="podtyp_kooperativa" name="podtyp_kooperativa" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2">
-                                    <option value="">Vyberte podtyp</option>
-                                    <option value="Koop_Moznost1">Koop_Možnost1</option>
-                                    <option value="Koop_Moznost2">Koop_Možnost2</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div id="zivotni_allianz_fields" data-pojistovna-id="1" class="hidden">
-                            <div class="mb-4">
-                                <label for="podtyp_allianz" class="block text-sm font-medium text-gray-700">Podtyp Allianz</label>
-                                <select id="podtyp_allianz" name="podtyp_allianz" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2">
-                                    <option value="">Vyberte podtyp</option>
-                                    <option value="Allianz_Moznost">Allianz_Možnost</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div id="zivotni_maxima_fields" data-pojistovna-id="4" class="hidden">
-                            <div class="mb-4">
-                                <label for="podtyp_maxima" class="block text-sm font-medium text-gray-700">Podtyp Maxima</label>
-                                <select id="podtyp_maxima" name="podtyp_maxima" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2">
-                                    <option value="">Vyberte podtyp</option>
-                                    <option value="Maxima_Moznost">Maxima_Možnost</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="flex items-center mb-4">
-                            <input type="checkbox" id="dip" name="dip" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                            <label for="dip" class="ml-2 block text-sm text-gray-900">DIP</label>
-                        </div>
-                        <div class="flex items-center mb-4">
-                            <input type="checkbox" id="detske" name="detske" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                            <label for="detske" class="ml-2 block text-sm text-gray-900">Dětské pojištění</label>
-                        </div>
-                    </div>
-
-                    <!-- Cestovní pojištění -->
-                    <div id="cestovni_pojisteni_fields" data-product-id="2" class="hidden">
-                        <div class="mb-4">
-                            <label for="cestovni_zacatek" class="block text-sm font-medium text-gray-700">Začátek pojištění</label>
-                            <input type="date" id="cestovni_zacatek" name="cestovni_zacatek" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2">
-                        </div>
-                        <div class="mb-4">
-                            <label for="cestovni_konec" class="block text-sm font-medium text-gray-700">Konec pojištění</label>
-                            <input type="date" id="cestovni_konec" name="cestovni_konec" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2">
-                        </div>
-                    </div>
-
-                    <!-- Autopojištění -->
-                    <div id="autopojisteni_fields" data-product-id="1" class="hidden">
-                        <div class="flex items-center mb-4">
-                            <input type="checkbox" id="pov" name="pov" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                            <label for="pov" class="ml-2 block text-sm text-gray-900">POV</label>
-                        </div>
-                        <div class="flex items-center mb-4">
-                            <input type="checkbox" id="hav" name="hav" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                            <label for="hav" class="ml-2 block text-sm text-gray-900">HAV</label>
-                        </div>
-                        <div class="mb-4">
-                            <label for="dalsi_pripojisteni" class="block text-sm font-medium text-gray-700">Další připojištění (text)</label>
-                            <input type="text" id="dalsi_pripojisteni" name="dalsi_pripojisteni" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2">
-                        </div>
-                    </div>
-
-                    <!-- Pojištění nemovitosti -->
-                    <div id="nemovitost_fields" data-product-id="8" class="hidden">
-                        <div class="grid grid-cols-2 gap-4">
-                            <div class="flex items-center">
-                                <input type="checkbox" id="nemovitost_domacnost" name="nemovitost_domacnost" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                                <label for="nemovitost_domacnost" class="ml-2 block text-sm text-gray-900">Domácnost</label>
-                            </div>
-                            <div class="flex items-center">
-                                <input type="checkbox" id="nemovitost_stavba" name="nemovitost_stavba" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                                <label for="nemovitost_stavba" class="ml-2 block text-sm text-gray-900">Stavba</label>
-                            </div>
-                            <div class="flex items-center">
-                                <input type="checkbox" id="nemovitost_odpovednost" name="nemovitost_odpovednost" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                                <label for="nemovitost_odpovednost" class="ml-2 block text-sm text-gray-900">Odpovědnost</label>
-                            </div>
-                            <div class="flex items-center">
-                                <input type="checkbox" id="nemovitost_asistence" name="nemovitost_asistence" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                                <label for="nemovitost_asistence" class="ml-2 block text-sm text-gray-900">Asistence</label>
-                            </div>
-                            <div class="flex items-center">
-                                <input type="checkbox" id="nemovitost_nop" name="nemovitost_nop" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                                <label for="nemovitost_nop" class="ml-2 block text-sm text-gray-900">NOP</label>
-                            </div>
-                        </div>
-                        <div class="mt-4 mb-4">
-                            <label for="nemovitost_nop_poznamka" class="block text-sm font-medium text-gray-700">Poznámka k NOP</label>
-                            <textarea id="nemovitost_nop_poznamka" name="nemovitost_nop_poznamka" rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2"></textarea>
-                        </div>
-                    </div>
-                </div>
-                <!-- Konec dynamických podmínek -->
-
-                <div class="mt-4 flex items-center">
-                    <input type="checkbox" id="zaznam_zeteo" name="zaznam_zeteo" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                    <label for="zaznam_zeteo" class="ml-2 block text-sm text-gray-900">
-                        Zeteo
-                    </label>
-                </div>
-                <div class="mb-4">
-                    <label for="soubor" class="block text-sm font-medium text-gray-700">Přiložit soubor (pouze PDF)</label>
-                    <input type="file" id="soubor" name="soubor" class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
-                </div>
-                <div class="md:col-span-2 mb-4">
-                    <label for="poznamka" class="block text-sm font-medium text-gray-700">Poznámka</label>
-                    <textarea id="poznamka" name="poznamka" rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2"></textarea>
-                </div>
-                <button type="submit" id="add-submit-btn" class="w-full mt-6 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200">
-                    Přidat smlouvu
-                </button>
-            </form>
-        </div>
-    </div>
-
-    <!-- Modální okno pro úpravu smlouvy -->
-    <div id="edit-modal" class="hidden fixed inset-0 z-50 overflow-auto bg-gray-800 bg-opacity-75 flex items-center justify-center">
-        <div class="bg-white rounded-lg p-6 w-full max-w-2xl mx-auto my-12 shadow-lg">
-            <div class="flex justify-between items-center pb-3">
-                <h2 class="text-2xl font-semibold text-gray-800">Upravit smlouvu</h2>
-                <button id="close-modal-btn" class="text-gray-500 hover:text-gray-700">
-                    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                    </svg>
-                </button>
-            </div>
-            <form action="" method="post" enctype="multipart/form-data">
-                <input type="hidden" name="update_id" id="edit_id">
-                <input type="hidden" name="stara_cesta_k_souboru" id="stara_cesta_k_souboru">
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div class="mb-4">
-                        <label for="edit_klient_id" class="block text-sm font-medium text-gray-700">Klient</label>
-                        <select id="edit_klient_id" name="klient_id" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2">
-                            <?php foreach ($klienti as $klient): ?>
-                                <option value="<?php echo htmlspecialchars($klient['id']); ?>"><?php echo htmlspecialchars($klient['jmeno']); ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="mb-4">
-                        <label for="edit_cislo_smlouvy" class="block text-sm font-medium text-gray-700">Číslo smlouvy</label>
-                        <input type="text" id="edit_cislo_smlouvy" name="cislo_smlouvy" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2">
-                    </div>
-                    <div class="mb-4">
-                        <label for="edit_produkt_id" class="block text-sm font-medium text-gray-700">Typ produktu</label>
-                        <select id="edit_produkt_id" name="produkt_id" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2">
-                            <?php foreach ($produkty as $produkt): ?>
-                                <option value="<?php echo htmlspecialchars($produkt['id']); ?>"><?php echo htmlspecialchars($produkt['nazev']); ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="mb-4">
-                        <label for="edit_pojistovna_id" class="block text-sm font-medium text-gray-700">Pojišťovna/Instituce</label>
-                        <select id="edit_pojistovna_id" name="pojistovna_id" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2">
-                            <?php foreach ($pojistovny as $pojistovna): ?>
-                                <option value="<?php echo htmlspecialchars($pojistovna['id']); ?>"><?php echo htmlspecialchars($pojistovna['nazev']); ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="mb-4">
-                        <label for="edit_datum_sjednani" class="block text-sm font-medium text-gray-700">Datum sjednání</label>
-                        <input type="date" id="edit_datum_sjednani" name="datum_sjednani" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2">
-                    </div>
-                    <div class="mb-4">
-                        <label for="edit_datum_platnosti" class="block text-sm font-medium text-gray-700">Datum počátku smlouvy</label>
-                        <input type="date" id="edit_datum_platnosti" name="datum_platnosti" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2">
-                    </div>
-                </div>
-
-                <!-- Dynamické podmínky pro editaci -->
-                <div id="edit-dynamic-fields" class="mt-4 border-t pt-4 border-gray-200">
-                    <!-- Životní pojištění -->
-                    <div id="edit_zivotni_pojisteni_fields" data-product-id="11" class="hidden">
-                        <div id="edit_zivotni_cpp_fields" data-pojistovna-id="2" class="hidden">
-                            <div class="mb-4">
-                                <label for="edit_podtyp_cpp" class="block text-sm font-medium text-gray-700">Podtyp ČPP</label>
-                                <select id="edit_podtyp_cpp" name="podtyp_cpp" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2">
-                                    <option value="">Vyberte podtyp</option>
-                                    <option value="RISK">RISK</option>
-                                    <option value="Life">Life</option>
-                                    <option value="Invest">Invest</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div id="edit_zivotni_kooperativa_fields" data-pojistovna-id="3" class="hidden">
-                            <div class="mb-4">
-                                <label for="edit_podtyp_kooperativa" class="block text-sm font-medium text-gray-700">Podtyp Kooperativa</label>
-                                <select id="edit_podtyp_kooperativa" name="podtyp_kooperativa" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2">
-                                    <option value="">Vyberte podtyp</option>
-                                    <option value="Koop_Moznost1">Koop_Možnost1</option>
-                                    <option value="Koop_Moznost2">Koop_Možnost2</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div id="edit_zivotni_allianz_fields" data-pojistovna-id="1" class="hidden">
-                            <div class="mb-4">
-                                <label for="edit_podtyp_allianz" class="block text-sm font-medium text-gray-700">Podtyp Allianz</label>
-                                <select id="edit_podtyp_allianz" name="podtyp_allianz" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2">
-                                    <option value="">Vyberte podtyp</option>
-                                    <option value="Allianz_Moznost">Allianz_Možnost</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div id="edit_zivotni_maxima_fields" data-pojistovna-id="4" class="hidden">
-                            <div class="mb-4">
-                                <label for="edit_podtyp_maxima" class="block text-sm font-medium text-gray-700">Podtyp Maxima</label>
-                                <select id="edit_podtyp_maxima" name="podtyp_maxima" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2">
-                                    <option value="">Vyberte podtyp</option>
-                                    <option value="Maxima_Moznost">Maxima_Možnost</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="flex items-center mb-4">
-                            <input type="checkbox" id="edit_dip" name="dip" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                            <label for="edit_dip" class="ml-2 block text-sm text-gray-900">DIP</label>
-                        </div>
-                        <div class="flex items-center mb-4">
-                            <input type="checkbox" id="edit_detske" name="detske" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                            <label for="edit_detske" class="ml-2 block text-sm text-gray-900">Dětské pojištění</label>
-                        </div>
-                    </div>
-
-                    <!-- Cestovní pojištění -->
-                    <div id="edit_cestovni_pojisteni_fields" data-product-id="2" class="hidden">
-                        <div class="mb-4">
-                            <label for="edit_cestovni_zacatek" class="block text-sm font-medium text-gray-700">Začátek pojištění</label>
-                            <input type="date" id="edit_cestovni_zacatek" name="cestovni_zacatek" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2">
-                        </div>
-                        <div class="mb-4">
-                            <label for="edit_cestovni_konec" class="block text-sm font-medium text-gray-700">Konec pojištění</label>
-                            <input type="date" id="edit_cestovni_konec" name="cestovni_konec" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2">
-                        </div>
-                    </div>
-
-                    <!-- Autopojištění -->
-                    <div id="edit_autopojisteni_fields" data-product-id="1" class="hidden">
-                        <div class="flex items-center mb-4">
-                            <input type="checkbox" id="edit_pov" name="pov" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                            <label for="edit_pov" class="ml-2 block text-sm text-gray-900">POV</label>
-                        </div>
-                        <div class="flex items-center mb-4">
-                            <input type="checkbox" id="edit_hav" name="hav" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                            <label for="edit_hav" class="ml-2 block text-sm text-gray-900">HAV</label>
-                        </div>
-                        <div class="mb-4">
-                            <label for="edit_dalsi_pripojisteni" class="block text-sm font-medium text-gray-700">Další připojištění (text)</label>
-                            <input type="text" id="edit_dalsi_pripojisteni" name="dalsi_pripojisteni" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2">
-                        </div>
-                    </div>
-
-                    <!-- Pojištění nemovitosti -->
-                    <div id="edit_nemovitost_fields" data-product-id="8" class="hidden">
-                        <div class="grid grid-cols-2 gap-4">
-                            <div class="flex items-center">
-                                <input type="checkbox" id="edit_nemovitost_domacnost" name="nemovitost_domacnost" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                                <label for="edit_nemovitost_domacnost" class="ml-2 block text-sm text-gray-900">Domácnost</label>
-                            </div>
-                            <div class="flex items-center">
-                                <input type="checkbox" id="edit_nemovitost_stavba" name="nemovitost_stavba" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                                <label for="edit_nemovitost_stavba" class="ml-2 block text-sm text-gray-900">Stavba</label>
-                            </div>
-                            <div class="flex items-center">
-                                <input type="checkbox" id="edit_nemovitost_odpovednost" name="nemovitost_odpovednost" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                                <label for="edit_nemovitost_odpovednost" class="ml-2 block text-sm text-gray-900">Odpovědnost</label>
-                            </div>
-                            <div class="flex items-center">
-                                <input type="checkbox" id="edit_nemovitost_asistence" name="nemovitost_asistence" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                                <label for="edit_nemovitost_asistence" class="ml-2 block text-sm text-gray-900">Asistence</label>
-                            </div>
-                            <div class="flex items-center">
-                                <input type="checkbox" id="edit_nemovitost_nop" name="nemovitost_nop" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                                <label for="edit_nemovitost_nop" class="ml-2 block text-sm text-gray-900">NOP</label>
-                            </div>
-                        </div>
-                        <div class="mt-4 mb-4">
-                            <label for="edit_nemovitost_nop_poznamka" class="block text-sm font-medium text-gray-700">Poznámka k NOP</label>
-                            <textarea id="edit_nemovitost_nop_poznamka" name="nemovitost_nop_poznamka" rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2"></textarea>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="mt-4 flex items-center">
-                    <input type="checkbox" id="edit_zaznam_zeteo" name="zaznam_zeteo" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                    <label for="edit_zaznam_zeteo" class="ml-2 block text-sm text-gray-900">Zeteo</label>
-                </div>
-                <div class="mb-4">
-                    <label for="edit_soubor" class="block text-sm font-medium text-gray-700">Přiložit nový soubor (pouze PDF)</label>
-                    <input type="file" id="edit_soubor" name="soubor" class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
-                </div>
-                <div class="md:col-span-2 mb-4">
-                    <label for="edit_poznamka" class="block text-sm font-medium text-gray-700">Poznámka</label>
-                    <textarea id="edit_poznamka" name="poznamka" rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2"></textarea>
-                </div>
-                <button type="submit" class="w-full mt-6 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200">
-                    Uložit změny
-                </button>
-            </form>
-        </div>
-    </div>
-
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Real-time vyhledávání pro smlouvy
-            const searchInput = document.getElementById('search');
-            let searchTimeout;
-
-            if (searchInput) {
-                searchInput.addEventListener('input', function() {
-                    clearTimeout(searchTimeout);
-                    const query = this.value.trim();
-
-                    // Zobrazit indikátor načítání
-                    const tableContainer = document.getElementById('contracts-table-container');
-                    tableContainer.innerHTML = '<div class="text-center py-4">Načítání...</div>';
-
-                    searchTimeout = setTimeout(() => {
-                        searchContracts(query);
-                    }, 300);
-                });
+            <?php
+            // Zavoláme naši novou funkci pro zobrazení tabulky
+            if (function_exists('displaySmlouvyTable')) {
+                displaySmlouvyTable($smlouvy);
+            } else {
+                echo "Funkce pro zobrazení tabulky není dostupná.";
             }
+            ?>
+        </div>
+    </div>
+</div>
 
-            function searchContracts(query) {
+
+<?php
+// Zobrazení modálních oken
+if (function_exists('displayAddModal')) {
+    displayAddModal($klienti, $produkty, $pojistovny);
+}
+if (function_exists('displayEditModal')) {
+    displayEditModal($klienti, $produkty, $pojistovny);
+}
+
+?>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('DOM loaded - initializing modal functionality');
+
+        // ✅ VYLEPŠENÁ VALIDACE - STEJNÁ JAKO V PŘEDCHOZÍM FUNKČNÍM KÓDU
+        function showError(fieldId, message) {
+            const errorElement = document.getElementById(fieldId + '_error');
+            const fieldElement = document.getElementById(fieldId);
+
+            if (errorElement && fieldElement) {
+                errorElement.textContent = message;
+                errorElement.classList.remove('hidden');
+                fieldElement.classList.add('border-red-500', 'border-2');
+                fieldElement.setAttribute('aria-invalid', 'true');
+                fieldElement.setAttribute('aria-describedby', fieldId + '_error');
+            }
+        }
+
+        function hideError(fieldId) {
+            const errorElement = document.getElementById(fieldId + '_error');
+            const fieldElement = document.getElementById(fieldId);
+
+            if (errorElement && fieldElement) {
+                errorElement.classList.add('hidden');
+                fieldElement.classList.remove('border-red-500', 'border-2');
+                fieldElement.removeAttribute('aria-invalid');
+                fieldElement.removeAttribute('aria-describedby');
+            }
+        }
+
+        function validateRequiredField(fieldId, fieldName) {
+            const value = document.getElementById(fieldId).value.trim();
+            if (!value) {
+                showError(fieldId, `${fieldName} je povinné pole`);
+                return false;
+            } else {
+                hideError(fieldId);
+                return true;
+            }
+        }
+
+        function validateAddForm() {
+            let isValid = true;
+            if (!validateRequiredField('cislo_smlouvy', 'Číslo smlouvy')) isValid = false;
+            if (!validateRequiredField('datum_sjednani', 'Datum sjednání')) isValid = false;
+            if (!validateRequiredField('datum_platnosti', 'Datum platnosti')) isValid = false;
+            return isValid;
+        }
+
+        function validateEditForm() {
+            let isValid = true;
+            if (!validateRequiredField('edit_cislo_smlouvy', 'Číslo smlouvy')) isValid = false;
+            if (!validateRequiredField('edit_datum_sjednani', 'Datum sjednání')) isValid = false;
+            if (!validateRequiredField('edit_datum_platnosti', 'Datum platnosti')) isValid = false;
+            return isValid;
+        }
+
+        // Funkce pro kontrolu duplicity čísla smlouvy
+        function checkDuplicateCisloSmlouvy(cisloSmlouvy, currentId = null) {
+            return new Promise((resolve, reject) => {
                 const xhr = new XMLHttpRequest();
-                xhr.open('GET', 'search_smlouvy.php?search=' + encodeURIComponent(query), true);
+                xhr.open('POST', '../app/controllers/check_duplicate_smlouva.php', true);
+                xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
 
                 xhr.onload = function() {
                     if (xhr.status === 200) {
-                        document.getElementById('contracts-table-container').innerHTML = xhr.responseText;
-
-                        // Aktualizovat informace o vyhledávání
-                        const searchInfo = document.getElementById('search-info');
-                        const resultCount = document.querySelectorAll('#contracts-table-container tbody tr').length;
-
-                        if (query) {
-                            searchInfo.innerHTML = `
-                            <p class="text-sm text-gray-500 mt-1">
-                                Vyhledávání: <span class="font-bold text-blue-600">"${query}"</span>
-                                (nalezeno: <span class="font-bold text-blue-600">${resultCount}</span>)
-                            </p>
-                        `;
-                        } else {
-                            searchInfo.innerHTML = '';
+                        try {
+                            const response = JSON.parse(xhr.responseText);
+                            resolve(response);
+                        } catch (e) {
+                            reject('Chyba při parsování odpovědi');
                         }
-
-                        // Znovu připojit event listenery
-                        attachEventListeners();
                     } else {
-                        document.getElementById('contracts-table-container').innerHTML = '<div class="text-center py-4 text-red-500">Chyba při načítání dat.</div>';
+                        reject('Chyba serveru');
                     }
                 };
 
                 xhr.onerror = function() {
-                    document.getElementById('contracts-table-container').innerHTML = '<div class="text-center py-4 text-red-500">Chyba připojení k serveru.</div>';
+                    reject('Chyba připojení');
                 };
 
-                xhr.send();
-            }
+                const data = `cislo_smlouvy=${encodeURIComponent(cisloSmlouvy)}${currentId ? `&current_id=${currentId}` : ''}`;
+                xhr.send(data);
+            });
+        }
 
-            // ✅ VYLEPŠENÁ VALIDACE
-            function showError(fieldId, message) {
-                const errorElement = document.getElementById(fieldId + '_error');
-                const fieldElement = document.getElementById(fieldId);
+        // Real-time validace pro přidání smlouvy
+        const cisloSmlouvyInput = document.getElementById('cislo_smlouvy');
+        const datumSjednaniInput = document.getElementById('datum_sjednani');
+        const datumPlatnostiInput = document.getElementById('datum_platnosti');
 
-                if (errorElement && fieldElement) {
-                    errorElement.textContent = message;
-                    errorElement.classList.remove('hidden');
-                    fieldElement.classList.add('border-red-500', 'border-2');
-                    fieldElement.setAttribute('aria-invalid', 'true');
-                    fieldElement.setAttribute('aria-describedby', fieldId + '_error');
-                }
-            }
-
-            function hideError(fieldId) {
-                const errorElement = document.getElementById(fieldId + '_error');
-                const fieldElement = document.getElementById(fieldId);
-
-                if (errorElement && fieldElement) {
-                    errorElement.classList.add('hidden');
-                    fieldElement.classList.remove('border-red-500', 'border-2');
-                    fieldElement.removeAttribute('aria-invalid');
-                    fieldElement.removeAttribute('aria-describedby');
-                }
-            }
-
-            function validateRequiredField(fieldId, fieldName) {
-                const value = document.getElementById(fieldId).value.trim();
-                if (!value) {
-                    showError(fieldId, `${fieldName} je povinné pole`);
-                    return false;
-                } else {
-                    hideError(fieldId);
-                    return true;
-                }
-            }
-
-            function validateAddForm() {
-                let isValid = true;
-                if (!validateRequiredField('cislo_smlouvy', 'Číslo smlouvy')) isValid = false;
-                if (!validateRequiredField('datum_sjednani', 'Datum sjednání')) isValid = false;
-                if (!validateRequiredField('datum_platnosti', 'Datum platnosti')) isValid = false;
-                return isValid;
-            }
-
-            function validateEditForm() {
-                let isValid = true;
-                if (!validateRequiredField('edit_cislo_smlouvy', 'Číslo smlouvy')) isValid = false;
-                if (!validateRequiredField('edit_datum_sjednani', 'Datum sjednání')) isValid = false;
-                if (!validateRequiredField('edit_datum_platnosti', 'Datum platnosti')) isValid = false;
-                return isValid;
-            }
-
-            // Funkce pro kontrolu duplicity čísla smlouvy
-            function checkDuplicateCisloSmlouvy(cisloSmlouvy, currentId = null) {
-                return new Promise((resolve, reject) => {
-                    const xhr = new XMLHttpRequest();
-                    xhr.open('POST', 'check_duplicate_smlouva.php', true);
-                    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-
-                    xhr.onload = function() {
-                        if (xhr.status === 200) {
-                            try {
-                                const response = JSON.parse(xhr.responseText);
-                                resolve(response);
-                            } catch (e) {
-                                reject('Chyba při parsování odpovědi');
-                            }
-                        } else {
-                            reject('Chyba serveru');
-                        }
-                    };
-
-                    xhr.onerror = function() {
-                        reject('Chyba připojení');
-                    };
-
-                    const data = `cislo_smlouvy=${encodeURIComponent(cisloSmlouvy)}${currentId ? `&current_id=${currentId}` : ''}`;
-                    xhr.send(data);
-                });
-            }
-
-            // Real-time validace pro přidání smlouvy
-            const cisloSmlouvyInput = document.getElementById('cislo_smlouvy');
-            const datumSjednaniInput = document.getElementById('datum_sjednani');
-            const datumPlatnostiInput = document.getElementById('datum_platnosti');
-
-            if (cisloSmlouvyInput) {
-                cisloSmlouvyInput.addEventListener('blur', function() {
-                    const cislo = this.value.trim();
-                    if (cislo) {
-                        hideError('cislo_smlouvy');
-                        showError('cislo_smlouvy', 'Kontroluji duplicitu...');
-
-                        checkDuplicateCisloSmlouvy(cislo).then(response => {
-                            hideError('cislo_smlouvy');
-                            if (response.duplicate) {
-                                showError('cislo_smlouvy', 'Smlouva s tímto číslem již existuje v databázi');
-                            }
-                        }).catch(error => {
-                            hideError('cislo_smlouvy');
-                            console.error('Chyba při kontrole duplicity:', error);
-                        });
-                    }
-                });
-
-                cisloSmlouvyInput.addEventListener('input', function() {
+        if (cisloSmlouvyInput) {
+            cisloSmlouvyInput.addEventListener('blur', function() {
+                const cislo = this.value.trim();
+                if (cislo) {
                     hideError('cislo_smlouvy');
-                    validateRequiredField('cislo_smlouvy', 'Číslo smlouvy');
-                });
-            }
+                    showError('cislo_smlouvy', 'Kontroluji duplicitu...');
 
-            // Real-time validace pro editaci smlouvy
-            const editCisloSmlouvyInput = document.getElementById('edit_cislo_smlouvy');
-            if (editCisloSmlouvyInput) {
-                editCisloSmlouvyInput.addEventListener('blur', function() {
-                    const cislo = this.value.trim();
-                    const currentId = document.getElementById('edit_id').value;
-                    if (cislo && currentId) {
-                        hideError('edit_cislo_smlouvy');
-                        showError('edit_cislo_smlouvy', 'Kontroluji duplicitu...');
-
-                        checkDuplicateCisloSmlouvy(cislo, currentId).then(response => {
-                            hideError('edit_cislo_smlouvy');
-                            if (response.duplicate) {
-                                showError('edit_cislo_smlouvy', 'Smlouva s tímto číslem již existuje v databázi');
-                            }
-                        }).catch(error => {
-                            hideError('edit_cislo_smlouvy');
-                            console.error('Chyba při kontrole duplicity:', error);
-                        });
-                    }
-                });
-
-                editCisloSmlouvyInput.addEventListener('input', function() {
-                    hideError('edit_cislo_smlouvy');
-                    validateRequiredField('edit_cislo_smlouvy', 'Číslo smlouvy');
-                });
-            }
-
-            // Validace před odesláním - přidání
-            const addForm = document.getElementById('add-smlouva-form');
-            const addSubmitBtn = document.querySelector('#add-smlouva-form button[type="submit"]');
-
-            if (addForm && addSubmitBtn) {
-                addForm.addEventListener('submit', async function(e) {
-                    e.preventDefault();
-
-                    // Zakázat tlačítko
-                    addSubmitBtn.disabled = true;
-                    addSubmitBtn.textContent = 'Kontroluji...';
-
-                    let canSubmit = true;
-
-                    // Validace povinných polí
-                    if (!validateAddForm()) {
-                        canSubmit = false;
-                    }
-
-                    // Kontrola duplicity před odesláním
-                    const cisloSmlouvy = document.getElementById('cislo_smlouvy').value.trim();
-                    if (cisloSmlouvy && canSubmit) {
-                        try {
-                            const duplicateCheck = await checkDuplicateCisloSmlouvy(cisloSmlouvy);
-                            if (duplicateCheck.duplicate) {
-                                showError('cislo_smlouvy', 'Smlouva s tímto číslem již existuje v databázi');
-                                canSubmit = false;
-                            }
-                        } catch (error) {
-                            console.error('Chyba při kontrole duplicity:', error);
-                            showError('cislo_smlouvy', 'Chyba při kontrole duplicity');
-                            canSubmit = false;
+                    checkDuplicateCisloSmlouvy(cislo).then(response => {
+                        hideError('cislo_smlouvy');
+                        if (response.duplicate) {
+                            showError('cislo_smlouvy', 'Smlouva s tímto číslem již existuje v databázi');
                         }
-                    }
-
-                    // Obnovit tlačítko
-                    addSubmitBtn.disabled = false;
-                    addSubmitBtn.textContent = 'Přidat smlouvu';
-
-                    if (canSubmit) {
-                        addForm.submit();
-                    } else {
-                        const firstError = document.querySelector('.border-red-500');
-                        if (firstError) {
-                            firstError.scrollIntoView({
-                                behavior: 'smooth',
-                                block: 'center'
-                            });
-                            firstError.focus();
-                        }
-                    }
-                });
-            }
-
-            // Validace před odesláním - editace
-            const editForm = document.getElementById('edit-smlouva-form');
-            const editSubmitBtn = document.querySelector('#edit-smlouva-form button[type="submit"]');
-
-            if (editForm && editSubmitBtn) {
-                editForm.addEventListener('submit', async function(e) {
-                    e.preventDefault();
-
-                    // Zakázat tlačítko
-                    editSubmitBtn.disabled = true;
-                    editSubmitBtn.textContent = 'Kontroluji...';
-
-                    let canSubmit = true;
-
-                    // Validace povinných polí
-                    if (!validateEditForm()) {
-                        canSubmit = false;
-                    }
-
-                    // Kontrola duplicity před odesláním
-                    const cisloSmlouvy = document.getElementById('edit_cislo_smlouvy').value.trim();
-                    const currentId = document.getElementById('edit_id').value;
-
-                    if (cisloSmlouvy && currentId && canSubmit) {
-                        try {
-                            const duplicateCheck = await checkDuplicateCisloSmlouvy(cisloSmlouvy, currentId);
-                            if (duplicateCheck.duplicate) {
-                                showError('edit_cislo_smlouvy', 'Smlouva s tímto číslem již existuje v databázi');
-                                canSubmit = false;
-                            }
-                        } catch (error) {
-                            console.error('Chyba při kontrole duplicity:', error);
-                            showError('edit_cislo_smlouvy', 'Chyba při kontrole duplicity');
-                            canSubmit = false;
-                        }
-                    }
-
-                    // Obnovit tlačítko
-                    editSubmitBtn.disabled = false;
-                    editSubmitBtn.textContent = 'Uložit změny';
-
-                    if (canSubmit) {
-                        editForm.submit();
-                    } else {
-                        const firstError = document.querySelector('.border-red-500');
-                        if (firstError) {
-                            firstError.scrollIntoView({
-                                behavior: 'smooth',
-                                block: 'center'
-                            });
-                            firstError.focus();
-                        }
-                    }
-                });
-            }
-
-            // Real-time validace povinných polí při psaní
-            const validationFields = [
-                cisloSmlouvyInput, datumSjednaniInput, datumPlatnostiInput,
-                editCisloSmlouvyInput, document.getElementById('edit_datum_sjednani'),
-                document.getElementById('edit_datum_platnosti')
-            ];
-
-            validationFields.forEach(input => {
-                if (input) {
-                    input.addEventListener('input', function() {
-                        const fieldId = this.id;
-                        const fieldName = this.previousElementSibling.textContent.replace('*', '').trim();
-                        validateRequiredField(fieldId, fieldName);
+                    }).catch(error => {
+                        hideError('cislo_smlouvy');
+                        console.error('Chyba při kontrole duplicity:', error);
                     });
                 }
             });
 
-            function attachEventListeners() {
-                // Připojit event listenery pro tlačítka editace
-                document.querySelectorAll('.edit-btn').forEach(button => {
-                    button.addEventListener('click', function() {
-                        const row = this.closest('tr');
-                        const data = row.dataset;
+            cisloSmlouvyInput.addEventListener('input', function() {
+                hideError('cislo_smlouvy');
+                validateRequiredField('cislo_smlouvy', 'Číslo smlouvy');
+            });
+        }
 
-                        // Vyplnění základních polí
-                        document.getElementById('edit_id').value = data.id;
-                        document.getElementById('edit_klient_id').value = data.klientId;
-                        document.getElementById('edit_cislo_smlouvy').value = data.cisloSmlouvy;
-                        document.getElementById('edit_produkt_id').value = data.produktId;
-                        document.getElementById('edit_pojistovna_id').value = data.pojistovnaId;
-                        document.getElementById('edit_datum_sjednani').value = data.datumSjednani;
-                        document.getElementById('edit_datum_platnosti').value = data.datumPlatnosti;
-                        document.getElementById('edit_zaznam_zeteo').checked = data.zaznamZeteo === '1';
-                        document.getElementById('edit_poznamka').value = data.poznamka;
-                        document.getElementById('stara_cesta_k_souboru').value = data.cestaKSouboru;
+        // Real-time validace pro editaci smlouvy
+        const editCisloSmlouvyInput = document.getElementById('edit_cislo_smlouvy');
+        if (editCisloSmlouvyInput) {
+            editCisloSmlouvyInput.addEventListener('blur', function() {
+                const cislo = this.value.trim();
+                const currentId = document.getElementById('edit_id').value;
+                if (cislo && currentId) {
+                    hideError('edit_cislo_smlouvy');
+                    showError('edit_cislo_smlouvy', 'Kontroluji duplicitu...');
 
-                        // Vyplnění dynamických polí
-                        const podminky = JSON.parse(data.podminkyProduktu || '{}');
-
-                        // Reset všech dynamických polí
-                        document.querySelectorAll('#edit-dynamic-fields input[type="text"]').forEach(input => input.value = '');
-                        document.querySelectorAll('#edit-dynamic-fields input[type="date"]').forEach(input => input.value = '');
-                        document.querySelectorAll('#edit-dynamic-fields input[type="checkbox"]').forEach(checkbox => checkbox.checked = false);
-                        document.querySelectorAll('#edit-dynamic-fields select').forEach(select => select.value = '');
-
-                        // Naplnění hodnot z JSONu
-                        if (podminky) {
-                            for (const key in podminky) {
-                                const element = document.getElementById(`edit_${key}`);
-                                if (element) {
-                                    if (element.type === 'checkbox') {
-                                        element.checked = podminky[key] === 'Ano';
-                                    } else {
-                                        element.value = podminky[key];
-                                    }
-                                }
-                            }
+                    checkDuplicateCisloSmlouvy(cislo, currentId).then(response => {
+                        hideError('edit_cislo_smlouvy');
+                        if (response.duplicate) {
+                            showError('edit_cislo_smlouvy', 'Smlouva s tímto číslem již existuje v databázi');
                         }
-
-                        // Aktualizace dynamických polí v modalu
-                        updateDynamicFields(data.produktId, data.pojistovnaId, editDynamicFieldsContainers);
-
-                        // Zobrazení modalu
-                        editModal.classList.remove('hidden');
+                    }).catch(error => {
+                        hideError('edit_cislo_smlouvy');
+                        console.error('Chyba při kontrole duplicity:', error);
                     });
-                });
+                }
+            });
 
-                // Připojit event listenery pro formuláře mazání
-                document.querySelectorAll('.delete-form').forEach(form => {
-                    form.addEventListener('submit', function(e) {
-                        const confirmMessage = this.dataset.confirm;
-                        if (!window.confirm(confirmMessage)) {
-                            e.preventDefault();
+            editCisloSmlouvyInput.addEventListener('input', function() {
+                hideError('edit_cislo_smlouvy');
+                validateRequiredField('edit_cislo_smlouvy', 'Číslo smlouvy');
+            });
+        }
+
+        // Validace před odesláním - přidání
+        const addForm = document.getElementById('add-smlouva-form');
+        const addSubmitBtn = document.getElementById('add-submit-btn');
+
+        if (addForm && addSubmitBtn) {
+            addForm.addEventListener('submit', async function(e) {
+                e.preventDefault();
+
+                // Zakázat tlačítko
+                addSubmitBtn.disabled = true;
+                addSubmitBtn.textContent = 'Kontroluji...';
+
+                let canSubmit = true;
+
+                // Validace povinných polí
+                if (!validateAddForm()) {
+                    canSubmit = false;
+                }
+
+                // Kontrola duplicity před odesláním
+                const cisloSmlouvy = document.getElementById('cislo_smlouvy').value.trim();
+                if (cisloSmlouvy && canSubmit) {
+                    try {
+                        const duplicateCheck = await checkDuplicateCisloSmlouvy(cisloSmlouvy);
+                        if (duplicateCheck.duplicate) {
+                            showError('cislo_smlouvy', 'Smlouva s tímto číslem již existuje v databázi');
+                            canSubmit = false;
                         }
-                    });
-                });
-            }
-
-            // Původní kód pro správu modálních oken a dynamických polí
-            const produktSelect = document.getElementById('produkt_id');
-            const pojistovnaSelect = document.getElementById('pojistovna_id');
-            const dynamicFieldsContainers = document.querySelectorAll('#dynamic-fields > div');
-
-            const addModal = document.getElementById('add-modal');
-            const openAddModalBtn = document.getElementById('open-add-modal-btn');
-            const closeAddModalBtn = document.getElementById('close-add-modal-btn');
-
-            const editModal = document.getElementById('edit-modal');
-            const closeEditModalBtn = document.getElementById('close-modal-btn');
-
-            const editProduktSelect = document.getElementById('edit_produkt_id');
-            const editPojistovnaSelect = document.getElementById('edit_pojistovna_id');
-            const editDynamicFieldsContainers = document.querySelectorAll('#edit-dynamic-fields > div');
-
-            function updateDynamicFields(produktId, pojistovnaId, containers) {
-                containers.forEach(container => {
-                    container.classList.add('hidden');
-                    const nestedDivs = container.querySelectorAll('div[data-pojistovna-id]');
-                    nestedDivs.forEach(nestedDiv => {
-                        nestedDiv.classList.add('hidden');
-                    });
-                });
-
-                const productContainer = document.querySelector(`#${containers[0].parentNode.id} > div[data-product-id="${produktId}"]`);
-                if (productContainer) {
-                    productContainer.classList.remove('hidden');
-                    if (produktId === '11') {
-                        const pojistovnaNestedDiv = productContainer.querySelector(`div[data-pojistovna-id="${pojistovnaId}"]`);
-                        if (pojistovnaNestedDiv) {
-                            pojistovnaNestedDiv.classList.remove('hidden');
-                        }
+                    } catch (error) {
+                        console.error('Chyba při kontrole duplicity:', error);
+                        showError('cislo_smlouvy', 'Chyba při kontrole duplicity');
+                        canSubmit = false;
                     }
                 }
-            }
 
-            // Původní posluchače pro přidávací formulář
-            if (produktSelect && pojistovnaSelect) {
-                produktSelect.addEventListener('change', () => updateDynamicFields(produktSelect.value, pojistovnaSelect.value, dynamicFieldsContainers));
-                pojistovnaSelect.addEventListener('change', () => updateDynamicFields(produktSelect.value, pojistovnaSelect.value, dynamicFieldsContainers));
-                updateDynamicFields(produktSelect.value, pojistovnaSelect.value, dynamicFieldsContainers);
-            }
+                // Obnovit tlačítko
+                addSubmitBtn.disabled = false;
+                addSubmitBtn.textContent = 'Přidat smlouvu';
 
-            // Posluchače pro editaci
-            if (editProduktSelect && editPojistovnaSelect) {
-                editProduktSelect.addEventListener('change', () => updateDynamicFields(editProduktSelect.value, editPojistovnaSelect.value, editDynamicFieldsContainers));
-                editPojistovnaSelect.addEventListener('change', () => updateDynamicFields(editProduktSelect.value, editPojistovnaSelect.value, editDynamicFieldsContainers));
-            }
+                if (canSubmit) {
+                    addForm.submit();
+                } else {
+                    const firstError = document.querySelector('.border-red-500');
+                    if (firstError) {
+                        firstError.scrollIntoView({
+                            behavior: 'smooth',
+                            block: 'center'
+                        });
+                        firstError.focus();
+                    }
+                }
+            });
+        }
 
-            // Otevření modálního okna pro přidání
-            if (openAddModalBtn) {
-                openAddModalBtn.addEventListener('click', () => {
-                    addModal.classList.remove('hidden');
-                });
-            }
+        // Validace před odesláním - editace
+        const editForm = document.getElementById('edit-smlouva-form');
+        const editSubmitBtn = document.getElementById('edit-submit-btn');
 
-            // Zavření modálního okna pro přidání
-            if (closeAddModalBtn) {
-                closeAddModalBtn.addEventListener('click', () => {
-                    addModal.classList.add('hidden');
-                });
-            }
+        if (editForm && editSubmitBtn) {
+            editForm.addEventListener('submit', async function(e) {
+                e.preventDefault();
 
-            // Zavření modálního okna pro editaci
-            if (closeEditModalBtn) {
-                closeEditModalBtn.addEventListener('click', () => {
-                    editModal.classList.add('hidden');
-                });
-            }
+                // Zakázat tlačítko
+                editSubmitBtn.disabled = true;
+                editSubmitBtn.textContent = 'Kontroluji...';
 
-            // Připojit event listenery
-            attachEventListeners();
+                let canSubmit = true;
+
+                // Validace povinných polí
+                if (!validateEditForm()) {
+                    canSubmit = false;
+                }
+
+                // Kontrola duplicity před odesláním
+                const cisloSmlouvy = document.getElementById('edit_cislo_smlouvy').value.trim();
+                const currentId = document.getElementById('edit_id').value;
+
+                if (cisloSmlouvy && currentId && canSubmit) {
+                    try {
+                        const duplicateCheck = await checkDuplicateCisloSmlouvy(cisloSmlouvy, currentId);
+                        if (duplicateCheck.duplicate) {
+                            showError('edit_cislo_smlouvy', 'Smlouva s tímto číslem již existuje v databázi');
+                            canSubmit = false;
+                        }
+                    } catch (error) {
+                        console.error('Chyba při kontrole duplicity:', error);
+                        showError('edit_cislo_smlouvy', 'Chyba při kontrole duplicity');
+                        canSubmit = false;
+                    }
+                }
+
+                // Obnovit tlačítko
+                editSubmitBtn.disabled = false;
+                editSubmitBtn.textContent = 'Uložit změny';
+
+                if (canSubmit) {
+                    editForm.submit();
+                } else {
+                    const firstError = document.querySelector('.border-red-500');
+                    if (firstError) {
+                        firstError.scrollIntoView({
+                            behavior: 'smooth',
+                            block: 'center'
+                        });
+                        firstError.focus();
+                    }
+                }
+            });
+        }
+
+        // Real-time validace povinných polí při psaní
+        document.querySelectorAll('.validation-field').forEach(field => {
+            field.addEventListener('input', function() {
+                const fieldId = this.id;
+                const fieldName = this.previousElementSibling.textContent.replace('*', '').trim();
+                validateRequiredField(fieldId, fieldName);
+            });
         });
-    </script>
-    <?php
-    // Uzavření připojení k databázi
-    $conn->close();
 
-    // Vložení patičky
-    include_once __DIR__ . '/../app/includes/footer.php';
-    ?>
+        // Zbytek kódu pro modální okna a dynamická pole zůstává
+        const openAddModalBtn = document.getElementById('open-add-modal-btn');
+        const addModal = document.getElementById('add-modal');
+        const closeAddModalBtn = document.getElementById('close-add-modal-btn');
+
+        const editModal = document.getElementById('edit-modal');
+        const closeEditModalBtn = document.getElementById('close-modal-btn');
+
+        // Otevření modálního okna pro přidání
+        if (openAddModalBtn && addModal) {
+            openAddModalBtn.addEventListener('click', () => {
+                addModal.classList.remove('hidden');
+            });
+        }
+
+        // Zavření modálního okna pro přidání
+        if (closeAddModalBtn && addModal) {
+            closeAddModalBtn.addEventListener('click', () => {
+                addModal.classList.add('hidden');
+            });
+        }
+
+        // Zavření modálního okna pro editaci
+        if (closeEditModalBtn && editModal) {
+            closeEditModalBtn.addEventListener('click', () => {
+                editModal.classList.add('hidden');
+            });
+        }
+        /*
+                // Zavření modálního okna při kliknutí mimo obsah
+                if (addModal) {
+                    addModal.addEventListener('click', function(e) {
+                        if (e.target === addModal) {
+                            addModal.classList.add('hidden');
+                        }
+                    });
+                }
+
+                if (editModal) {
+                    editModal.addEventListener('click', function(e) {
+                        if (e.target === editModal) {
+                            editModal.classList.add('hidden');
+                        }
+                    });
+                }
+        */
+        // Zpracování tlačítek pro editaci v tabulce
+        document.querySelectorAll('.edit-btn').forEach(button => {
+            button.addEventListener('click', async function() {
+                const row = this.closest('tr');
+                const data = row.dataset;
+
+                // Resetujte formulář před naplněním novými daty
+                document.getElementById('edit-smlouva-form').reset();
+
+                // Vyplnění základních polí
+                document.getElementById('edit_id').value = data.id;
+                document.getElementById('edit_klient_id').value = data.klientId;
+                document.getElementById('edit_cislo_smlouvy').value = data.cisloSmlouvy;
+                document.getElementById('edit_produkt_id').value = data.produktId;
+                document.getElementById('edit_pojistovna_id').value = data.pojistovnaId;
+                document.getElementById('edit_datum_sjednani').value = data.datumSjednani;
+                document.getElementById('edit_datum_platnosti').value = data.datumPlatnosti;
+                document.getElementById('edit_zaznam_zeteo').checked = data.zaznamZeteo === '1';
+                document.getElementById('edit_poznamka').value = data.poznamka;
+                document.getElementById('stara_cesta_k_souboru').value = data.cestaKSouboru;
+
+                // Zobrazení modalu
+                editModal.classList.remove('hidden');
+
+                // Reset chybových zpráv
+                document.querySelectorAll('[id$="_error"]').forEach(errorElement => {
+                    errorElement.classList.add('hidden');
+                });
+                document.querySelectorAll('.validation-field').forEach(field => {
+                    field.classList.remove('border-red-500', 'border-2');
+                });
+
+                // Po vyplnění základních dat aktualizujeme dynamická pole
+                setTimeout(() => {
+                    const produktId = document.getElementById('edit_produkt_id').value;
+                    const pojistovnaId = document.getElementById('edit_pojistovna_id').value;
+                    updateDynamicFields(produktId, pojistovnaId, true);
+
+                    // Naplníme dynamická pole daty z podmínek
+                    if (data.podminkyProduktu) {
+                        try {
+                            const podminky = JSON.parse(data.podminkyProduktu);
+                            fillDynamicFields(produktId, pojistovnaId, podminky, true);
+                        } catch (e) {
+                            console.error('Chyba při načítání podmínek:', e);
+                        }
+                    }
+                }, 100);
+            });
+        });
+
+        // Funkce pro resetování všech dynamických polí
+        function resetDynamicFields(isEdit = false) {
+            const prefix = isEdit ? 'edit_' : '';
+
+            // Reset všech typů polí v dynamických sekcích
+            const dynamicContainer = document.getElementById(`${prefix}dynamic-fields`);
+            if (!dynamicContainer) return;
+
+            // Reset checkboxů
+            const checkboxes = dynamicContainer.querySelectorAll('input[type="checkbox"]');
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = false;
+            });
+
+            // Reset textových polí
+            const textFields = dynamicContainer.querySelectorAll('input[type="text"]');
+            textFields.forEach(field => {
+                field.value = '';
+            });
+
+            // Reset textareas
+            const textareas = dynamicContainer.querySelectorAll('textarea');
+            textareas.forEach(textarea => {
+                textarea.value = '';
+            });
+
+            // Reset selectů - nastavit na první option
+            const selects = dynamicContainer.querySelectorAll('select');
+            selects.forEach(select => {
+                if (select.options.length > 0) {
+                    select.selectedIndex = 0;
+                }
+            });
+
+            // Reset date polí
+            const dateFields = dynamicContainer.querySelectorAll('input[type="date"]');
+            dateFields.forEach(field => {
+                field.value = '';
+            });
+
+            console.log(`Resetováno ${checkboxes.length} checkboxů, ${textFields.length} textových polí, ${textareas.length} textareas, ${selects.length} selectů, ${dateFields.length} date polí`);
+        }
+
+        // Dynamické zobrazování podmínek podle produktu a pojišťovny
+        function updateDynamicFields(produktId, pojistovnaId, isEdit = false) {
+            const prefix = isEdit ? 'edit_' : '';
+            console.log(`Aktualizace dynamických polí: produkt=${produktId}, pojišťovna=${pojistovnaId}, edit=${isEdit}`);
+
+            // Nejprve resetujte všechna dynamická pole
+            resetDynamicFields(isEdit);
+
+            // Skryj všechny dynamické bloky
+            const allDynamicBlocks = document.querySelectorAll(`#${prefix}dynamic-fields > div`);
+            allDynamicBlocks.forEach(block => {
+                block.classList.add('hidden');
+            });
+
+            // Zobraz příslušný blok podle produktu
+            const productSlug = getProductSlug(produktId);
+            const productBlock = document.getElementById(`${prefix}${productSlug}_fields`);
+
+            if (productBlock) {
+                console.log(`Zobrazuji blok pro produkt: ${productSlug}`);
+                productBlock.classList.remove('hidden');
+
+                // Pro životní pojištění zobraz příslušnou pojišťovnu
+                if (produktId == 11) {
+                    const insurerBlocks = productBlock.querySelectorAll('div[data-pojistovna-id]');
+                    insurerBlocks.forEach(block => {
+                        block.classList.add('hidden');
+                    });
+
+                    const specificInsurerBlock = productBlock.querySelector(`div[data-pojistovna-id="${pojistovnaId}"]`);
+                    if (specificInsurerBlock) {
+                        specificInsurerBlock.classList.remove('hidden');
+                        console.log(`Zobrazuji blok pro pojišťovnu: ${pojistovnaId}`);
+                    }
+                }
+            } else {
+                console.log(`Blok pro produkt ${productSlug} nebyl nalezen`);
+            }
+
+            // Debug výpis
+            setTimeout(() => {
+                const visibleBlocks = document.querySelectorAll(`#${prefix}dynamic-fields > div:not(.hidden)`);
+                console.log(`Po aktualizaci je viditelných ${visibleBlocks.length} bloků:`);
+                visibleBlocks.forEach(block => {
+                    console.log(`- ${block.id}`);
+                });
+            }, 50);
+        }
+
+        // Pomocná funkce pro získání slug produktu
+        function getProductSlug(produktId) {
+            switch (produktId) {
+                case '11':
+                    return 'zivotni_pojisteni';
+                case '2':
+                    return 'cestovni_pojisteni';
+                case '1':
+                    return 'autopojisteni';
+                case '8':
+                    return 'nemovitost';
+                case '12':
+                    return 'bytovy';
+                default:
+                    return '';
+            }
+        }
+
+        // Funkce pro naplnění dynamických polí z dat
+        function fillDynamicFields(produktId, pojistovnaId, podminky, isEdit = false) {
+            const prefix = isEdit ? 'edit_' : '';
+
+            switch (produktId) {
+                case '11': // Životní pojištění
+                    if (document.getElementById(`${prefix}dip`)) {
+                        document.getElementById(`${prefix}dip`).checked = podminky.dip === 'Ano';
+                    }
+                    if (document.getElementById(`${prefix}detske`)) {
+                        document.getElementById(`${prefix}detske`).checked = podminky.detske === 'Ano';
+                    }
+                    // Naplnění podtypu podle pojišťovny
+                    switch (pojistovnaId) {
+                        case '1':
+                            if (document.getElementById(`${prefix}podtyp_allianz`)) {
+                                document.getElementById(`${prefix}podtyp_allianz`).value = podminky.podtyp || '';
+                            }
+                            break;
+                        case '2':
+                            if (document.getElementById(`${prefix}podtyp_cpp`)) {
+                                document.getElementById(`${prefix}podtyp_cpp`).value = podminky.podtyp || '';
+                            }
+                            break;
+                        case '3':
+                            if (document.getElementById(`${prefix}podtyp_kooperativa`)) {
+                                document.getElementById(`${prefix}podtyp_kooperativa`).value = podminky.podtyp || '';
+                            }
+                            break;
+                        case '4':
+                            if (document.getElementById(`${prefix}podtyp_maxima`)) {
+                                document.getElementById(`${prefix}podtyp_maxima`).value = podminky.podtyp || '';
+                            }
+                            break;
+                    }
+                    break;
+
+                case '2': // Cestovní pojištění
+                    if (document.getElementById(`${prefix}cestovni_zacatek`)) {
+                        document.getElementById(`${prefix}cestovni_zacatek`).value = podminky.zacatek || '';
+                    }
+                    if (document.getElementById(`${prefix}cestovni_konec`)) {
+                        document.getElementById(`${prefix}cestovni_konec`).value = podminky.konec || '';
+                    }
+                    break;
+
+                case '1': // Autopojištění
+                    if (document.getElementById(`${prefix}pov`)) {
+                        document.getElementById(`${prefix}pov`).checked = podminky.pov === 'Ano';
+                    }
+                    if (document.getElementById(`${prefix}hav`)) {
+                        document.getElementById(`${prefix}hav`).checked = podminky.hav === 'Ano';
+                    }
+                    if (document.getElementById(`${prefix}dalsi_pripojisteni`)) {
+                        document.getElementById(`${prefix}dalsi_pripojisteni`).value = podminky.dalsi_pripojisteni || '';
+                    }
+                    break;
+
+                case '8': // Pojištění nemovitosti
+                    if (document.getElementById(`${prefix}nemovitost_domacnost`)) {
+                        document.getElementById(`${prefix}nemovitost_domacnost`).checked = podminky.domacnost === 'Ano';
+                    }
+                    if (document.getElementById(`${prefix}nemovitost_stavba`)) {
+                        document.getElementById(`${prefix}nemovitost_stavba`).checked = podminky.stavba === 'Ano';
+                    }
+                    if (document.getElementById(`${prefix}nemovitost_odpovednost`)) {
+                        document.getElementById(`${prefix}nemovitost_odpovednost`).checked = podminky.odpovednost === 'Ano';
+                    }
+                    if (document.getElementById(`${prefix}nemovitost_asistence`)) {
+                        document.getElementById(`${prefix}nemovitost_asistence`).checked = podminky.asistence === 'Ano';
+                    }
+                    if (document.getElementById(`${prefix}nemovitost_nop`)) {
+                        document.getElementById(`${prefix}nemovitost_nop`).checked = podminky.nop === 'Ano';
+                    }
+                    if (document.getElementById(`${prefix}nemovitost_nop_poznamka`)) {
+                        document.getElementById(`${prefix}nemovitost_nop_poznamka`).value = podminky.nop_poznamka || '';
+                    }
+                    break;
+
+                case '12': // Bytový dům
+                    if (document.getElementById(`${prefix}bytovy_domacnost`)) {
+                        document.getElementById(`${prefix}bytovy_domacnost`).checked = podminky.domacnost === 'Ano';
+                    }
+                    if (document.getElementById(`${prefix}bytovy_stavba`)) {
+                        document.getElementById(`${prefix}bytovy_stavba`).checked = podminky.stavba === 'Ano';
+                    }
+                    if (document.getElementById(`${prefix}bytovy_odpovednost`)) {
+                        document.getElementById(`${prefix}bytovy_odpovednost`).checked = podminky.odpovednost === 'Ano';
+                    }
+                    if (document.getElementById(`${prefix}bytovy_asistence`)) {
+                        document.getElementById(`${prefix}bytovy_asistence`).checked = podminky.asistence === 'Ano';
+                    }
+                    if (document.getElementById(`${prefix}bytovy_nop`)) {
+                        document.getElementById(`${prefix}bytovy_nop`).checked = podminky.nop === 'Ano';
+                    }
+                    if (document.getElementById(`${prefix}bytovy_nop_poznamka`)) {
+                        document.getElementById(`${prefix}bytovy_nop_poznamka`).value = podminky.nop_poznamka || '';
+                    }
+                    break;
+            }
+        }
+
+        // Inicializace pro přidávací formulář
+        const produktSelect = document.getElementById('produkt_id');
+        const pojistovnaSelect = document.getElementById('pojistovna_id');
+
+        if (produktSelect && pojistovnaSelect) {
+            produktSelect.addEventListener('change', function() {
+                updateDynamicFields(this.value, pojistovnaSelect.value, false);
+            });
+
+            pojistovnaSelect.addEventListener('change', function() {
+                updateDynamicFields(produktSelect.value, this.value, false);
+            });
+
+            // Inicializace při načtení
+            updateDynamicFields(produktSelect.value, pojistovnaSelect.value, false);
+        }
+
+        // Inicializace pro editační formulář
+        const editProduktSelect = document.getElementById('edit_produkt_id');
+        const editPojistovnaSelect = document.getElementById('edit_pojistovna_id');
+
+        if (editProduktSelect && editPojistovnaSelect) {
+            editProduktSelect.addEventListener('change', function() {
+                updateDynamicFields(this.value, editPojistovnaSelect.value, true);
+            });
+
+            editPojistovnaSelect.addEventListener('change', function() {
+                updateDynamicFields(editProduktSelect.value, this.value, true);
+            });
+        }
+
+
+        // Otevření modálního okna pro přidání
+        if (openAddModalBtn && addModal) {
+            openAddModalBtn.addEventListener('click', () => {
+                // Resetujte formulář
+                document.getElementById('add-smlouva-form').reset();
+
+                // Resetujte dynamická pole
+                resetDynamicFields(false);
+
+                // Reset chybových zpráv
+                document.querySelectorAll('[id$="_error"]').forEach(errorElement => {
+                    errorElement.classList.add('hidden');
+                });
+                document.querySelectorAll('.validation-field').forEach(field => {
+                    field.classList.remove('border-red-500', 'border-2');
+                });
+
+                // Aktualizujte dynamická pole podle výchozích hodnot
+                const produktId = document.getElementById('produkt_id').value;
+                const pojistovnaId = document.getElementById('pojistovna_id').value;
+                updateDynamicFields(produktId, pojistovnaId, false);
+
+                addModal.classList.remove('hidden');
+            });
+        }
+
+        console.log('Modal functionality initialized');
+    });
+</script>
+
+<?php
+
+// Vložení patičky
+include_once __DIR__ . '/../app/includes/footer.php';
+?>
