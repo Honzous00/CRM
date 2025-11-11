@@ -11,7 +11,7 @@ class DokumentyModel
     public function getDokumentyBySmlouva($smlouva_id)
     {
         $dokumenty = [];
-        $stmt = $this->conn->prepare("SELECT * FROM dokumenty WHERE smlouva_id = ? ORDER BY poradi, datum_vytvoreni");
+        $stmt = $this->conn->prepare("SELECT * FROM dokumenty WHERE smlouva_id = ? ORDER BY typ_dokumentu, datum_vytvoreni");
         $stmt->bind_param("i", $smlouva_id);
         $stmt->execute();
         $result = $stmt->get_result();

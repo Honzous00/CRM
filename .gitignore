@@ -3,5 +3,7 @@ Poznámky.md
 .todo
 testing/
 backup/
-uploads/*
+uploads/
 !uploads/.gitkeep
+debug_upload.php
+logs/

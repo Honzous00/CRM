@@ -55,7 +55,7 @@ class SmlouvyController
         $poznamka = $this->conn->real_escape_string($_POST['poznamka']);
         $cesta_k_souboru = $_POST['stara_cesta_k_souboru'];
 
-        // Zpracování souboru
+        // Zpracování souboru hlavní smlouvy PŘED update v databázi
         if (isset($_FILES['soubor']) && $_FILES['soubor']['error'] == UPLOAD_ERR_OK) {
             $uploadResult = $this->processFileUpload($_FILES['soubor']);
             if ($uploadResult['success']) {
@@ -70,16 +70,20 @@ class SmlouvyController
         $podminky_produktu = $this->processDynamicConditions($produkt_id, $pojistovna_id, $_POST);
         $json_podminky = json_encode($podminky_produktu);
 
-        // Update v databázi - OPRAVA ZDE:
+        // Update v databázi
         $stmt_update = $this->conn->prepare("UPDATE smlouvy SET klient_id=?, cislo_smlouvy=?, produkt_id=?, pojistovna_id=?, datum_sjednani=?, datum_platnosti=?, zaznam_zeteo=?, poznamka=?, podminky_produktu=?, cesta_k_souboru=? WHERE id=?");
         $stmt_update->bind_param("isssssisssi", $klient_id, $cislo_smlouvy, $produkt_id, $pojistovna_id, $datum_sjednani, $datum_platnosti, $zaznam_zeteo, $poznamka, $json_podminky, $cesta_k_souboru, $id);
 
         if ($stmt_update->execute()) {
+            // ZPRACOVÁNÍ DOKUMENTŮ - Hlavní smlouva již byla zpracována (true)
+            if (!$this->processDocuments($id, $_POST, $_FILES, true)) {
+                return;
+            }
+
             $this->setMessage("Smlouva byla úspěšně aktualizována.", "success");
             header("Location: smlouvy.php");
             exit;
         } else {
-            // ZACHYCENÍ DUPLICITNÍ CHYBY
             if ($this->conn->errno == 1062) {
                 $this->setMessage("Chyba: Smlouva s číslem '" . $cislo_smlouvy . "' již existuje v databázi.", "error");
             } else {
@@ -108,7 +112,7 @@ class SmlouvyController
             return;
         }
 
-        // Zpracování souboru
+        // Zpracování souboru hlavní smlouvy PŘED vložením do databáze
         if (isset($_FILES['soubor']) && $_FILES['soubor']['error'] == UPLOAD_ERR_OK) {
             $uploadResult = $this->processFileUpload($_FILES['soubor']);
             if ($uploadResult['success']) {
@@ -123,21 +127,21 @@ class SmlouvyController
         $podminky_produktu = $this->processDynamicConditions($produkt_id, $pojistovna_id, $_POST);
         $json_podminky = json_encode($podminky_produktu);
 
-        // Vložení smlouvy do databáze - OPRAVA ZDE:
+        // Vložení smlouvy do databáze
         $stmt_insert = $this->conn->prepare("INSERT INTO smlouvy (klient_id, cislo_smlouvy, produkt_id, pojistovna_id, datum_sjednani, datum_platnosti, zaznam_zeteo, poznamka, podminky_produktu, cesta_k_souboru) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         $stmt_insert->bind_param("isssssisss", $klient_id, $cislo_smlouvy, $produkt_id, $pojistovna_id, $datum_sjednani, $datum_platnosti, $zaznam_zeteo, $poznamka, $json_podminky, $cesta_k_souboru);
 
         if ($stmt_insert->execute()) {
+            $smlouva_id = $stmt_insert->insert_id;
+
+            // ZPRACOVÁNÍ DOKUMENTŮ - Hlavní smlouva již byla zpracována (true)
+            if (!$this->processDocuments($smlouva_id, $_POST, $_FILES, true)) {
+                return;
+            };
+
             $this->setMessage("Smlouva byla úspěšně přidána.", "success");
-            header("Location: smlouvy.php");
-            exit;
-        } else {
-            // ZACHYCENÍ DUPLICITNÍ CHYBY
-            if ($this->conn->errno == 1062) { // MySQL error code for duplicate entry
-                $this->setMessage("Chyba: Smlouva s číslem '" . $cislo_smlouvy . "' již existuje v databázi.", "error");
-            } else {
-                $this->setMessage("Chyba při přidávání smlouvy: " . $stmt_insert->error, "error");
-            }
+            //header("Location: smlouvy.php");
+            //exit;
         }
         $stmt_insert->close();
     }
@@ -176,19 +180,73 @@ class SmlouvyController
     {
         $file_tmp_path = $file['tmp_name'];
         $file_name = $file['name'];
+        $file_size = $file['size'];
+        $file_error = $file['error'];
         $file_ext = strtolower(pathinfo($file_name, PATHINFO_EXTENSION));
 
-        if ($file_ext !== 'pdf') {
-            return ['success' => false, 'error' => 'Nahráný soubor není PDF.'];
+        // Kontrola chyby uploadu
+        if ($file_error !== UPLOAD_ERR_OK) {
+            $upload_errors = [
+                UPLOAD_ERR_INI_SIZE => 'Soubor překračuje maximální povolenou velikost',
+                UPLOAD_ERR_FORM_SIZE => 'Soubor překračuje maximální velikost formuláře',
+                UPLOAD_ERR_PARTIAL => 'Soubor byl nahrán pouze částečně',
+                UPLOAD_ERR_NO_FILE => 'Nebyl nahrán žádný soubor',
+                UPLOAD_ERR_NO_TMP_DIR => 'Chybí dočasná složka',
+                UPLOAD_ERR_CANT_WRITE => 'Chyba zápisu na disk',
+                UPLOAD_ERR_EXTENSION => 'Nahrávání zastaveno extensioní'
+            ];
+            $error_message = $upload_errors[$file_error] ?? "Neznámá chyba uploadu: $file_error";
+            return ['success' => false, 'error' => $error_message];
         }
 
-        $new_file_name = uniqid('smlouva_', true) . '.pdf';
-        $upload_path = __DIR__ . '/../../uploads/' . $new_file_name;
+        // POVOLIT KONTROLU: existence dočasného souboru
+        if (!file_exists($file_tmp_path)) {
+            return ['success' => false, 'error' => 'Dočasný soubor neexistuje.'];
+        }
 
+        // POVOLIT KONTROLU: zda je soubor skutečně nahraný
+        if (!is_uploaded_file($file_tmp_path)) {
+            return ['success' => false, 'error' => 'Soubor nebyl nahraný legitimním způsobem.'];
+        }
+
+        // Kontrola velikosti souboru (10MB)
+        $max_size = 10 * 1024 * 1024;
+        if ($file_size > $max_size) {
+            return ['success' => false, 'error' => 'Soubor je příliš velký. Maximální velikost je 10MB.'];
+        }
+
+        // Povolené typy souborů
+        $allowed_extensions = ['pdf', 'jpg', 'jpeg', 'png', 'gif'];
+        if (!in_array($file_ext, $allowed_extensions)) {
+            return ['success' => false, 'error' => 'Nepodporovaný typ souboru. Povolené typy: ' . implode(', ', $allowed_extensions)];
+        }
+
+        $new_file_name = uniqid('dokument_', true) . '.' . $file_ext;
+        $project_root = realpath(__DIR__ . '/../../');
+        $upload_dir = $project_root . DIRECTORY_SEPARATOR . 'public' . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR;
+
+        if (!is_dir($upload_dir)) {
+            if (!mkdir($upload_dir, 0755, true)) {
+                $error = error_get_last();
+                $error_message = $error ? $error['message'] : 'Neznámá chyba při vytváření složky';
+                return ['success' => false, 'error' => 'Nelze vytvořit složku pro upload: ' . $error_message];
+            }
+        }
+
+        if (!is_writable($upload_dir)) {
+            return ['success' => false, 'error' => 'Složka pro upload není zapisovatelná. Zkontrolujte práva.'];
+        }
+
+        $upload_path = $upload_dir . $new_file_name;
+
+        // VRÁTIT: Použijte move_uploaded_file místo copy
         if (move_uploaded_file($file_tmp_path, $upload_path)) {
-            return ['success' => true, 'file_path' => 'uploads/' . $new_file_name];
+            $relative_path = 'uploads/' . $new_file_name;
+            return ['success' => true, 'file_path' => $relative_path];
         } else {
-            return ['success' => false, 'error' => 'Chyba při nahrávání souboru.'];
+            $error = error_get_last();
+            $error_message = $error ? $error['message'] : 'Neznámá chyba při přesunu souboru';
+            return ['success' => false, 'error' => 'Chyba při nahrávání souboru: ' . $error_message];
         }
     }
 
@@ -353,5 +411,116 @@ class SmlouvyController
     {
         $this->message = $message;
         $this->message_type = $type;
+    }
+
+    private function processDocuments($smlouva_id, $post_data, $files_data, $hlavni_smlouva_jiz_zpracovana = false)
+    {
+        $dokumentyModel = new DokumentyModel($this->conn);
+
+        // Zpracování hlavní smlouvy - POUZE POKUD JEŠTĚ NEBYLA ZPRACOVÁNA
+        if (!$hlavni_smlouva_jiz_zpracovana && isset($files_data['soubor']) && $files_data['soubor']['error'] == UPLOAD_ERR_OK) {
+            $uploadResult = $this->processFileUpload($files_data['soubor']);
+            if ($uploadResult['success']) {
+                $dokumentyModel->pridejDokument(
+                    $smlouva_id,
+                    'Smlouva',
+                    $files_data['soubor']['name'],
+                    $uploadResult['file_path'],
+                    $post_data['poznamka'] ?? ''
+                );
+            } else {
+                $this->setMessage($uploadResult['error'], "error");
+                return false;
+            }
+        }
+
+        // Zpracování příloh
+        if (isset($post_data['dokument_typ']) && is_array($post_data['dokument_typ'])) {
+
+            // Zkontrolujeme, zda máme pole dokument_soubor
+            if (isset($files_data['dokument_soubor']) && is_array($files_data['dokument_soubor']['name'])) {
+
+                foreach ($post_data['dokument_typ'] as $index => $typ) {
+                    $typ = trim($typ);
+                    if (empty($typ)) continue;
+
+                    $popis = $post_data['dokument_popis'][$index] ?? '';
+
+                    // Kontrola, zda pro tento index existuje soubor
+                    if (!isset($files_data['dokument_soubor']['name'][$index])) {
+                        continue;
+                    }
+
+                    // Sestavení pole pro jeden soubor
+                    $file_info = [
+                        'name' => $files_data['dokument_soubor']['name'][$index],
+                        'type' => $files_data['dokument_soubor']['type'][$index],
+                        'tmp_name' => $files_data['dokument_soubor']['tmp_name'][$index],
+                        'error' => $files_data['dokument_soubor']['error'][$index],
+                        'size' => $files_data['dokument_soubor']['size'][$index]
+                    ];
+
+                    if ($file_info['error'] == UPLOAD_ERR_OK) {
+                        $uploadResult = $this->processFileUpload($file_info);
+                        if ($uploadResult['success']) {
+                            $dokumentyModel->pridejDokument(
+                                $smlouva_id,
+                                $typ,
+                                $file_info['name'],
+                                $uploadResult['file_path'],
+                                $popis
+                            );
+                        } else {
+                            $this->setMessage("Chyba při nahrávání přílohy '$typ': " . $uploadResult['error'], "error");
+                            return false;
+                        }
+                    } elseif ($file_info['error'] != UPLOAD_ERR_NO_FILE) {
+                        $upload_errors = [
+                            UPLOAD_ERR_INI_SIZE => 'Soubor překračuje maximální povolenou velikost',
+                            UPLOAD_ERR_FORM_SIZE => 'Soubor překračuje maximální velikost formuláře',
+                            UPLOAD_ERR_PARTIAL => 'Soubor byl nahrán pouze částečně',
+                            UPLOAD_ERR_NO_FILE => 'Nebyl nahrán žádný soubor',
+                            UPLOAD_ERR_NO_TMP_DIR => 'Chybí dočasná složka',
+                            UPLOAD_ERR_CANT_WRITE => 'Chyba zápisu na disk',
+                            UPLOAD_ERR_EXTENSION => 'Nahrávání zastaveno extensioní'
+                        ];
+                        $error_message = $upload_errors[$file_info['error']] ?? "Neznámá chyba uploadu: " . $file_info['error'];
+                        $this->setMessage("Chyba při nahrávání přílohy '$typ': " . $error_message, "error");
+                        return false;
+                    }
+                }
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Reorganizuje FILES pole z PHP struktury do normální podoby
+     */
+    private function reorganizeFilesArray($files, $key)
+    {
+        $reorganized = [];
+        if (!isset($files[$key])) {
+            return $reorganized;
+        }
+
+        // Pokud je to normální soubor (ne pole), vrátíme jej jako jediný prvek
+        if (!is_array($files[$key]['name'])) {
+            return [0 => $files[$key]];
+        }
+
+        // Reorganizace pole souborů
+        foreach ($files[$key]['name'] as $index => $name) {
+            $reorganized[$index] = [
+                'name' => $files[$key]['name'][$index],
+                'type' => $files[$key]['type'][$index],
+                'tmp_name' => $files[$key]['tmp_name'][$index],
+                'error' => $files[$key]['error'][$index],
+                'size' => $files[$key]['size'][$index]
+            ];
+        }
+
+        return $reorganized;
     }
 }

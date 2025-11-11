@@ -1,4 +1,21 @@
 <?php
+// Diagnostika PHP limitů
+error_reporting(E_ALL);
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
+
+// Zkontrolujeme error log
+$error_log = ini_get('error_log');
+echo "<!-- PHP error_log: $error_log -->";
+
+// Vytvoříme vlastní error log pokud neexistuje
+$custom_log = __DIR__ . '/../logs/upload_errors.log';
+if (!file_exists(dirname($custom_log))) {
+    mkdir(dirname($custom_log), 0755, true);
+}
+ini_set('error_log', $custom_log);
+echo "<!-- Custom error_log: $custom_log -->";
+
 // Vložení login logiky a kontrola přihlášení
 include_once __DIR__ . '/../app/includes/login.php';
 require_login();
@@ -75,7 +92,7 @@ $smlouvy = $controller->getSmlouvy($_GET['search'] ?? '');
             <?php
             // Zavoláme naši novou funkci pro zobrazení tabulky
             if (function_exists('displaySmlouvyTable')) {
-                displaySmlouvyTable($smlouvy);
+                displaySmlouvyTable($smlouvy, $conn);
             } else {
                 echo "Funkce pro zobrazení tabulky není dostupná.";
             }
@@ -88,15 +105,63 @@ $smlouvy = $controller->getSmlouvy($_GET['search'] ?? '');
 <?php
 // Zobrazení modálních oken
 if (function_exists('displayAddModal')) {
-    displayAddModal($klienti, $produkty, $pojistovny);
+    displayAddModal($klienti, $produkty, $pojistovny, $conn);
 }
 if (function_exists('displayEditModal')) {
-    displayEditModal($klienti, $produkty, $pojistovny);
+    displayEditModal($klienti, $produkty, $pojistovny, $conn);
 }
 
 ?>
 
 <script>
+    let dokumentCounter = 1;
+
+    function addDokument() {
+        const container = document.getElementById('dokumenty-container');
+        const newRow = document.createElement('div');
+        newRow.className = 'dokument-row mb-4 p-4 border border-gray-200 rounded-lg bg-white';
+        newRow.innerHTML = `
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Typ dokumentu *</label>
+                <input type="text" name="dokument_typ[${dokumentCounter}]" list="typy-dokumentu" 
+                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2 dokument-typ"
+                       placeholder="Začněte psát pro návrhy..." required>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Soubor *</label>
+                <input type="file" name="dokument_soubor[${dokumentCounter}]" 
+                       class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                       accept=".pdf,.jpg,.jpeg,.png,.gif" required>
+                <p class="text-xs text-gray-500 mt-1">PDF, JPG, PNG, GIF (max. 10MB)</p>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Popis</label>
+                <input type="text" name="dokument_popis[${dokumentCounter}]" 
+                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2"
+                       placeholder="Volitelný popis...">
+                <button type="button" onclick="removeDokument(this)" class="mt-2 text-red-600 hover:text-red-800 text-sm">Odstranit</button>
+            </div>
+        </div>
+    `;
+        container.appendChild(newRow);
+        dokumentCounter++;
+    }
+
+    function removeDokument(button) {
+        const row = button.closest('.dokument-row');
+        if (document.querySelectorAll('.dokument-row').length > 1) {
+            row.remove();
+        } else {
+            row.querySelectorAll('input').forEach(input => {
+                if (input.type !== 'file') {
+                    input.value = '';
+                }
+            });
+            row.querySelector('input[type="file"]').value = '';
+        }
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
         console.log('DOM loaded - initializing modal functionality');
 
@@ -727,6 +792,31 @@ if (function_exists('displayEditModal')) {
         }
 
         console.log('Modal functionality initialized');
+
+
+        // Inicializace dokumentů pro přidání
+        const addModalBtn = document.getElementById('open-add-modal-btn');
+        if (addModalBtn) {
+            addModalBtn.addEventListener('click', function() {
+                dokumentCounter = 1;
+            });
+        }
+
+        // Inicializace dokumentů pro editaci
+        document.querySelectorAll('.edit-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                dokumentCounter = 1;
+                // Zde můžete načíst existující dokumenty pro editaci pomocí AJAXu
+            });
+        });
+
+        // Inicializace při načtení stránky
+        document.addEventListener('DOMContentLoaded', function() {
+            // Resetovat počítadlo při otevření modálního okna
+            document.getElementById('open-add-modal-btn').addEventListener('click', function() {
+                okumentCounter = 1;
+            });
+        });
     });
 </script>
 

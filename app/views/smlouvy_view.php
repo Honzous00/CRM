@@ -1,6 +1,6 @@
 <?php
 
-function displaySmlouvyTable($smlouvy)
+function displaySmlouvyTable($smlouvy, $conn)
 {
     if (empty($smlouvy)) {
         echo '<p class="text-gray-500">Zatím nejsou přidány žádné smlouvy.</p>';
@@ -62,9 +62,24 @@ function displaySmlouvyTable($smlouvy)
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                             <?php if (!empty($row['cesta_k_souboru'])): ?>
-                                <a href="<?php echo htmlspecialchars($row['cesta_k_souboru']); ?>" target="_blank" class="text-blue-600 hover:text-blue-800 transition-colors duration-200">
-                                    Stáhnout PDF
-                                </a>
+                                <div class="flex flex-col">
+                                    <a href="<?php echo htmlspecialchars($row['cesta_k_souboru']); ?>" target="_blank"
+                                        class="text-blue-600 hover:text-blue-800 transition-colors duration-200 mb-1">
+                                        📄 Hlavní smlouva
+                                    </a>
+                                    <?php
+                                    // Načtení příloh
+                                    $dokumentyModel = new DokumentyModel($conn);
+                                    $dokumenty = $dokumentyModel->getDokumentyBySmlouva($row['id']);
+                                    foreach ($dokumenty as $dokument):
+                                        if ($dokument['typ_dokumentu'] !== 'Smlouva'): ?>
+                                            <a href="<?php echo htmlspecialchars($dokument['cesta_k_souboru']); ?>" target="_blank"
+                                                class="text-green-600 hover:text-green-800 transition-colors duration-200 text-xs">
+                                                📎 <?php echo htmlspecialchars($dokument['typ_dokumentu']); ?>
+                                            </a>
+                                    <?php endif;
+                                    endforeach; ?>
+                                </div>
                             <?php else: ?>
                                 N/A
                             <?php endif; ?>

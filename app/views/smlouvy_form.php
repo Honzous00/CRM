@@ -1,10 +1,12 @@
 <?php
-function displayAddModal($klienti, $produkty, $pojistovny)
+function displayAddModal($klienti, $produkty, $pojistovny, $conn)
 {
+    $dokumentyModel = new DokumentyModel($conn);
+    $typyDokumentu = $dokumentyModel->getTypyDokumentu();
 ?>
     <!-- Modální okno pro přidání smlouvy -->
-    <div id="add-modal" class="hidden fixed inset-0 z-50 overflow-auto bg-gray-800 bg-opacity-75 flex items-center justify-center">
-        <div class="bg-white rounded-lg p-6 w-full max-w-2xl mx-auto my-12 shadow-lg">
+    <div id="add-modal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-gray-800 bg-opacity-75 flex justify-center items-start pt-12">
+        <div class="bg-white rounded-lg p-6 w-full max-w-5xl mx-auto my-12 shadow-lg">
             <div class="flex justify-between items-center pb-3">
                 <h2 class="text-2xl font-semibold text-gray-800">Přidat novou smlouvu</h2>
                 <button id="close-add-modal-btn" class="text-gray-500 hover:text-gray-700">
@@ -14,7 +16,7 @@ function displayAddModal($klienti, $produkty, $pojistovny)
                 </button>
             </div>
             <form action="" method="post" enctype="multipart/form-data" id="add-smlouva-form">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div class="mb-4">
                         <label for="klient_id" class="block text-sm font-medium text-gray-700">Klient</label>
                         <select id="klient_id" name="klient_id" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2">
@@ -246,6 +248,44 @@ function displayAddModal($klienti, $produkty, $pojistovny)
                     <label for="soubor" class="block text-sm font-medium text-gray-700">Přiložit soubor (pouze PDF)</label>
                     <input type="file" id="soubor" name="soubor" class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
                 </div>
+                <div class="mt-6 border-t pt-6">
+                    <h3 class="text-lg font-semibold mb-4">Další dokumenty</h3>
+
+                    <div id="dokumenty-container">
+                        <!-- Prázdné pole pro první přílohu -->
+                        <div class="dokument-row mb-4 p-4 border border-gray-200 rounded-lg">
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Typ dokumentu</label>
+                                    <input type="text" name="dokument_typ[0]" list="typy-dokumentu"
+                                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2 dokument-typ">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Soubor</label>
+                                    <input type="file" name="dokument_soubor[0]"
+                                        class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Popis</label>
+                                    <input type="text" name="dokument_popis[0]"
+                                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2">
+                                    <button type="button" onclick="removeDokument(this)" class="mt-2 text-red-600 hover:text-red-800 text-sm">Odstranit</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="button" onclick="addDokument()" class="mt-4 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors">
+                        + Přidat další dokument
+                    </button>
+                </div>
+
+                <datalist id="typy-dokumentu">
+                    <?php
+                    foreach ($typyDokumentu as $typ): ?>
+                        <option value="<?php echo htmlspecialchars($typ); ?>">
+                        <?php endforeach; ?>
+                </datalist>
                 <div class="md:col-span-2 mb-4">
                     <label for="poznamka" class="block text-sm font-medium text-gray-700">Poznámka</label>
                     <textarea id="poznamka" name="poznamka" rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2"></textarea>
@@ -259,12 +299,14 @@ function displayAddModal($klienti, $produkty, $pojistovny)
 <?php
 }
 
-function displayEditModal($klienti, $produkty, $pojistovny)
+function displayEditModal($klienti, $produkty, $pojistovny, $conn)
 {
+    $dokumentyModel = new DokumentyModel($conn);
+    $typyDokumentu = $dokumentyModel->getTypyDokumentu();
 ?>
     <!-- Modální okno pro úpravu smlouvy -->
-    <div id="edit-modal" class="hidden fixed inset-0 z-50 overflow-auto bg-gray-800 bg-opacity-75 flex items-center justify-center">
-        <div class="bg-white rounded-lg p-6 w-full max-w-2xl mx-auto my-12 shadow-lg">
+    <div id="edit-modal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-gray-800 bg-opacity-75 flex justify-center items-start pt-12">
+        <div class="bg-white rounded-lg p-6 w-full max-w-5xl mx-auto my-12 shadow-lg">
             <div class="flex justify-between items-center pb-3">
                 <h2 class="text-2xl font-semibold text-gray-800">Upravit smlouvu</h2>
                 <button id="close-modal-btn" class="text-gray-500 hover:text-gray-700">
@@ -277,7 +319,7 @@ function displayEditModal($klienti, $produkty, $pojistovny)
                 <input type="hidden" name="update_id" id="edit_id">
                 <input type="hidden" name="stara_cesta_k_souboru" id="stara_cesta_k_souboru">
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div class="mb-4">
                         <label for="edit_klient_id" class="block text-sm font-medium text-gray-700">Klient</label>
                         <select id="edit_klient_id" name="klient_id" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2">
@@ -488,6 +530,44 @@ function displayEditModal($klienti, $produkty, $pojistovny)
                     <label for="edit_soubor" class="block text-sm font-medium text-gray-700">Přiložit nový soubor (pouze PDF)</label>
                     <input type="file" id="edit_soubor" name="soubor" class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
                 </div>
+                <div class="mt-6 border-t pt-6">
+                    <h3 class="text-lg font-semibold mb-4">Další dokumenty</h3>
+
+                    <div id="dokumenty-container">
+                        <!-- Prázdné pole pro první přílohu -->
+                        <div class="dokument-row mb-4 p-4 border border-gray-200 rounded-lg">
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Typ dokumentu</label>
+                                    <input type="text" name="dokument_typ[0]" list="typy-dokumentu"
+                                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2 dokument-typ">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Soubor</label>
+                                    <input type="file" name="dokument_soubor[0]"
+                                        class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Popis</label>
+                                    <input type="text" name="dokument_popis[0]"
+                                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2">
+                                    <button type="button" onclick="removeDokument(this)" class="mt-2 text-red-600 hover:text-red-800 text-sm">Odstranit</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="button" onclick="addDokument()" class="mt-4 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors">
+                        + Přidat další dokument
+                    </button>
+                </div>
+
+                <datalist id="typy-dokumentu">
+                    <?php
+                    foreach ($typyDokumentu as $typ): ?>
+                        <option value="<?php echo htmlspecialchars($typ); ?>">
+                        <?php endforeach; ?>
+                </datalist>
                 <div class="md:col-span-2 mb-4">
                     <label for="edit_poznamka" class="block text-sm font-medium text-gray-700">Poznámka</label>
                     <textarea id="edit_poznamka" name="poznamka" rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2"></textarea>
