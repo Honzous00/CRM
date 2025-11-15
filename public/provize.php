@@ -30,6 +30,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->bind_param("isdidsii", $smlouva_id, $datum_vyplaty, $castka, $stornovana, $storno_rezerva, $cislo_vypisu, $stupen_vyplaceni, $provize_id);
 
         if ($stmt->execute()) {
+            // Zpracování předávacího dokumentu
+            if (isset($_POST['cislo_vypisu'])) {
+                $cislo_vypisu_clean = trim($_POST['cislo_vypisu']);
+                if (!empty($cislo_vypisu_clean)) {
+                    // Najdi nebo vytvoř předávací dokument
+                    $sql_find = "SELECT id FROM predavaci_dokumenty WHERE cislo = ?";
+                    $stmt_find = $conn->prepare($sql_find);
+                    $stmt_find->bind_param("s", $cislo_vypisu_clean);
+                    $stmt_find->execute();
+                    $result_find = $stmt_find->get_result();
+
+                    if ($result_find->num_rows > 0) {
+                        $row = $result_find->fetch_assoc();
+                        $predavaci_dokument_id = $row['id'];
+                    } else {
+                        $sql_insert = "INSERT INTO predavaci_dokumenty (cislo) VALUES (?)";
+                        $stmt_insert = $conn->prepare($sql_insert);
+                        $stmt_insert->bind_param("s", $cislo_vypisu_clean);
+                        $stmt_insert->execute();
+                        $predavaci_dokument_id = $stmt_insert->insert_id;
+                        $stmt_insert->close();
+                    }
+                    $stmt_find->close();
+
+                    // Aktualizuj smlouvu - přiřaď předávací dokument
+                    $sql_update_smlouva = "UPDATE smlouvy SET predavaci_dokument_id = ? WHERE id = ?";
+                    $stmt_update_smlouva = $conn->prepare($sql_update_smlouva);
+                    $stmt_update_smlouva->bind_param("ii", $predavaci_dokument_id, $smlouva_id);
+                    $stmt_update_smlouva->execute();
+                    $stmt_update_smlouva->close();
+                } else {
+                    // Číslo výpisu je prázdné - odpoj smlouvu od předávacího dokumentu
+                    $sql_update_smlouva = "UPDATE smlouvy SET predavaci_dokument_id = NULL WHERE id = ?";
+                    $stmt_update_smlouva = $conn->prepare($sql_update_smlouva);
+                    $stmt_update_smlouva->bind_param("i", $smlouva_id);
+                    $stmt_update_smlouva->execute();
+                    $stmt_update_smlouva->close();
+                }
+            }
+
             $message = "Provize byla úspěšně upravena.";
             $message_type = "success";
             header("Location: provize.php");
@@ -45,6 +85,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->bind_param("isdidsi", $smlouva_id, $datum_vyplaty, $castka, $stornovana, $storno_rezerva, $cislo_vypisu, $stupen_vyplaceni);
 
         if ($stmt->execute()) {
+            // Zpracování předávacího dokumentu
+            if (isset($_POST['cislo_vypisu'])) {
+                $cislo_vypisu_clean = trim($_POST['cislo_vypisu']);
+                if (!empty($cislo_vypisu_clean)) {
+                    // Najdi nebo vytvoř předávací dokument
+                    $sql_find = "SELECT id FROM predavaci_dokumenty WHERE cislo = ?";
+                    $stmt_find = $conn->prepare($sql_find);
+                    $stmt_find->bind_param("s", $cislo_vypisu_clean);
+                    $stmt_find->execute();
+                    $result_find = $stmt_find->get_result();
+
+                    if ($result_find->num_rows > 0) {
+                        $row = $result_find->fetch_assoc();
+                        $predavaci_dokument_id = $row['id'];
+                    } else {
+                        $sql_insert = "INSERT INTO predavaci_dokumenty (cislo) VALUES (?)";
+                        $stmt_insert = $conn->prepare($sql_insert);
+                        $stmt_insert->bind_param("s", $cislo_vypisu_clean);
+                        $stmt_insert->execute();
+                        $predavaci_dokument_id = $stmt_insert->insert_id;
+                        $stmt_insert->close();
+                    }
+                    $stmt_find->close();
+
+                    // Aktualizuj smlouvu - přiřaď předávací dokument
+                    $sql_update_smlouva = "UPDATE smlouvy SET predavaci_dokument_id = ? WHERE id = ?";
+                    $stmt_update_smlouva = $conn->prepare($sql_update_smlouva);
+                    $stmt_update_smlouva->bind_param("ii", $predavaci_dokument_id, $smlouva_id);
+                    $stmt_update_smlouva->execute();
+                    $stmt_update_smlouva->close();
+                } else {
+                    // Číslo výpisu je prázdné - odpoj smlouvu od předávacího dokumentu
+                    $sql_update_smlouva = "UPDATE smlouvy SET predavaci_dokument_id = NULL WHERE id = ?";
+                    $stmt_update_smlouva = $conn->prepare($sql_update_smlouva);
+                    $stmt_update_smlouva->bind_param("i", $smlouva_id);
+                    $stmt_update_smlouva->execute();
+                    $stmt_update_smlouva->close();
+                }
+            }
+
             $message = "Provize byla úspěšně přidána.";
             $message_type = "success";
             header("Location: provize.php");
@@ -99,10 +179,13 @@ $sql_provize = "
         provize.stupen_vyplaceni,
         provize.datum_vytvoreni,
         smlouvy.cislo_smlouvy,
+        predavaci_dokumenty.cislo AS predavaci_dokument,
+        predavaci_dokumenty.id AS predavaci_dokument_id,
         klienti.jmeno AS jmeno_klienta
     FROM provize
     LEFT JOIN smlouvy ON provize.smlouva_id = smlouvy.id
     LEFT JOIN klienti ON smlouvy.klient_id = klienti.id
+    LEFT JOIN predavaci_dokumenty ON smlouvy.predavaci_dokument_id = predavaci_dokumenty.id
     ORDER BY provize.datum_vytvoreni DESC
 ";
 $result_provize = $conn->query($sql_provize);
@@ -186,7 +269,16 @@ $count_results = $result_provize->num_rows;
                                         <?php echo $row['stornovana'] ? '&#x2714;' : '&#x2718;'; ?>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($row['storno_rezerva']); ?></td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($row['cislo_vypisu']); ?></td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                        <?php if (!empty($row['predavaci_dokument'])): ?>
+                                            <a href="predavaci_dokumenty.php?id=<?php echo $row['predavaci_dokument_id']; ?>"
+                                                class="text-blue-600 hover:text-blue-800 transition-colors duration-200">
+                                                <?php echo htmlspecialchars($row['cislo_vypisu']); ?>
+                                            </a>
+                                        <?php else: ?>
+                                            <?php echo htmlspecialchars($row['cislo_vypisu']); ?>
+                                        <?php endif; ?>
+                                    </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($row['stupen_vyplaceni']); ?></td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><?php echo date('d.m.Y', strtotime($row['datum_vytvoreni'])); ?></td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -309,6 +401,7 @@ $count_results = $result_provize->num_rows;
                         <label for="storno_rezerva" class="block text-sm font-medium text-gray-700">Stornorezerva</label>
                         <input type="number" step="0.01" id="storno_rezerva" name="storno_rezerva" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2">
                     </div>
+
                     <div class="mb-4">
                         <label for="cislo_vypisu" class="block text-sm font-medium text-gray-700">Číslo výpisu</label>
                         <input type="number" id="cislo_vypisu" name="cislo_vypisu" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2">
@@ -330,9 +423,9 @@ $count_results = $result_provize->num_rows;
                 </button>
             </div>
         </form>
-
     </div>
 </div>
+
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {

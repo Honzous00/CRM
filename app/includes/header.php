@@ -22,6 +22,7 @@
                     <li><a href="../public/klienti.php" class="hover:text-blue-200 transition-colors duration-200">Klienti</a></li>
                     <li><a href="../public/smlouvy.php" class="hover:text-blue-200 transition-colors duration-200">Smlouvy</a></li>
                     <li><a href="../public/provize.php" class="hover:text-blue-200 transition-colors duration-200">Provize</a></li>
+                    <li><a href="../public/predavaci_dokumenty.php" class="hover:text-blue-200 transition-colors duration-200">Předávací dokumenty</a></li>
                     <li><a href="../public/produkty.php" class="hover:text-blue-200 transition-colors duration-200">Produkty</a></li>
                     <li><a href="../public/pojistovny.php" class="hover:text-blue-200 transition-colors duration-200">Pojišťovny</a></li>
                     <li><a href="../public/logout.php" class="hover:text-blue-200 transition-colors duration-200">Odhlášení</a></li>
