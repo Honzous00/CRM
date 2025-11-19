@@ -230,7 +230,8 @@ if ($result_klienti->num_rows > 0) {
                     <tbody class="bg-white divide-y divide-gray-200">
                         <?php if (!empty($klienti)): ?>
                             <?php foreach ($klienti as $klient): ?>
-                                <tr>
+                                <tr class="cursor-pointer hover:bg-blue-50 transition-colors duration-150 client-row"
+                                    data-client-id="<?php echo $klient['id']; ?>">
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($klient['jmeno']); ?></td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($klient['rc_ico']); ?></td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($klient['email']); ?></td>
@@ -238,7 +239,6 @@ if ($result_klienti->num_rows > 0) {
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($klient['ulice'] . ', ' . $klient['mesto'] . ', ' . $klient['psc']); ?></td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                         <?php
-                                        // Zobrazí korespondenční adresu pouze pokud je jiná než trvalá
                                         if ($klient['ulice'] !== $klient['korespondencni_ulice'] || $klient['mesto'] !== $klient['korespondencni_mesto'] || $klient['psc'] !== $klient['korespondencni_psc']) {
                                             echo htmlspecialchars($klient['korespondencni_ulice'] . ', ' . $klient['korespondencni_mesto'] . ', ' . $klient['korespondencni_psc']);
                                         } else {
@@ -246,7 +246,7 @@ if ($result_klienti->num_rows > 0) {
                                         }
                                         ?>
                                     </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium" onclick="event.stopPropagation()">
                                         <button onclick="openEditModal(<?php echo htmlspecialchars(json_encode($klient)); ?>)" class="text-blue-600 hover:text-blue-900 mr-2">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block mr-1" viewBox="0 0 20 20" fill="currentColor">
                                                 <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
@@ -271,6 +271,36 @@ if ($result_klienti->num_rows > 0) {
                         <?php endif; ?>
                     </tbody>
                 </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal pro zobrazení smluv klienta -->
+<div id="smlouvyModal" class="fixed z-20 inset-0 overflow-y-auto hidden">
+    <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div class="fixed inset-0 transition-opacity" aria-hidden="true">
+            <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+        </div>
+
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+        <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-6xl sm:w-full">
+            <!-- Hlavička modálního okna s tlačítkem zavřít -->
+            <div class="flex justify-between items-center p-6 border-b border-gray-200">
+                <h2 class="text-2xl font-semibold text-gray-800">Smlouvy klienta</h2>
+                <button type="button" onclick="closeSmlouvyModal()" class="text-gray-500 hover:text-gray-700">
+                    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Tělo modálního okna -->
+            <div class="bg-white px-6 py-4">
+                <div id="smlouvy-content">
+                    <!-- Obsah se načte dynamicky -->
+                </div>
             </div>
         </div>
     </div>
@@ -464,10 +494,20 @@ if ($result_klienti->num_rows > 0) {
 </div>
 
 <script>
+    //until this
     // Real-time vyhledávání
     document.addEventListener('DOMContentLoaded', function() {
         const searchInput = document.getElementById('search');
         let searchTimeout;
+
+        // Event delegation pro klikání na řádky (funguje i pro dynamicky načtený obsah)
+        document.getElementById('clients-table-container').addEventListener('click', function(e) {
+            const row = e.target.closest('.client-row');
+            if (row && !e.target.closest('button') && !e.target.closest('a')) {
+                const clientId = row.getAttribute('data-client-id');
+                openSmlouvyModal(clientId);
+            }
+        });
 
         searchInput.addEventListener('input', function() {
             clearTimeout(searchTimeout);
@@ -479,7 +519,7 @@ if ($result_klienti->num_rows > 0) {
 
             searchTimeout = setTimeout(() => {
                 searchClients(query);
-            }, 300); // Zpoždění 300ms pro optimalizaci
+            }, 300);
         });
 
         function searchClients(query) {
@@ -492,18 +532,28 @@ if ($result_klienti->num_rows > 0) {
 
                     // Aktualizovat informace o vyhledávání
                     const searchInfo = document.getElementById('search-info');
-                    const resultCount = document.querySelectorAll('#clients-table-container tbody tr').length - 1; // Odečteme řádek s "žádní klienti"
+                    const resultCount = document.querySelectorAll('#clients-table-container tbody tr').length - 1;
 
                     if (query) {
                         searchInfo.innerHTML = `
-                            <p class="text-sm text-gray-500 mt-1">
-                                Vyhledávání: <span class="font-bold text-blue-600">"${query}"</span>
-                                (nalezeno: <span class="font-bold text-blue-600">${resultCount}</span>)
-                            </p>
-                        `;
+                        <p class="text-sm text-gray-500 mt-1">
+                            Vyhledávání: <span class="font-bold text-blue-600">"${query}"</span>
+                            (nalezeno: <span class="font-bold text-blue-600">${resultCount}</span>)
+                        </p>
+                    `;
                     } else {
                         searchInfo.innerHTML = '';
                     }
+
+                    // Přidat historii URL pro možnost sdílení vyhledávání
+                    const url = new URL(window.location);
+                    if (query) {
+                        url.searchParams.set('search', query);
+                    } else {
+                        url.searchParams.delete('search');
+                    }
+                    window.history.replaceState({}, '', url);
+
                 } else {
                     document.getElementById('clients-table-container').innerHTML = '<div class="text-center py-4 text-red-500">Chyba při načítání dat.</div>';
                 }
@@ -514,6 +564,14 @@ if ($result_klienti->num_rows > 0) {
             };
 
             xhr.send();
+        }
+
+        // Načíst vyhledávací parametr z URL při načtení stránky
+        const urlParams = new URLSearchParams(window.location.search);
+        const searchParam = urlParams.get('search');
+        if (searchParam) {
+            searchInput.value = searchParam;
+            searchClients(searchParam);
         }
 
         // Původní kód pro správu modálních oken
@@ -543,6 +601,33 @@ if ($result_klienti->num_rows > 0) {
             });
         }
     });
+
+    // Původní kód pro správu modálních oken
+    const jinaAdresaCheckbox = document.getElementById('jina_adresa');
+    const korespondencniAdresaFields = document.getElementById('korespondencni-adresa-fields');
+
+    if (jinaAdresaCheckbox) {
+        jinaAdresaCheckbox.addEventListener('change', function() {
+            if (this.checked) {
+                korespondencniAdresaFields.classList.remove('hidden');
+            } else {
+                korespondencniAdresaFields.classList.add('hidden');
+            }
+        });
+    }
+
+    const editJinaAdresaCheckbox = document.getElementById('edit-jina_adresa');
+    const editKorespondencniAdresaFields = document.getElementById('edit-korespondencni-adresa-fields');
+
+    if (editJinaAdresaCheckbox) {
+        editJinaAdresaCheckbox.addEventListener('change', function() {
+            if (this.checked) {
+                editKorespondencniAdresaFields.classList.remove('hidden');
+            } else {
+                editKorespondencniAdresaFields.classList.add('hidden');
+            }
+        });
+    }
 
     function openAddModal() {
         document.getElementById('addModal').classList.remove('hidden');
@@ -581,6 +666,34 @@ if ($result_klienti->num_rows > 0) {
 
     function closeEditModal() {
         document.getElementById('editModal').classList.add('hidden');
+    }
+
+    function openSmlouvyModal(clientId) {
+        // Zobrazíme loading stav
+        document.getElementById('smlouvy-content').innerHTML = '<div class="text-center py-4">Načítání smluv...</div>';
+        document.getElementById('smlouvyModal').classList.remove('hidden');
+
+        // Načteme smlouvy pomocí AJAX
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', 'get_smlouvy_klienta.php?klient_id=' + clientId, true);
+
+        xhr.onload = function() {
+            if (xhr.status === 200) {
+                document.getElementById('smlouvy-content').innerHTML = xhr.responseText;
+            } else {
+                document.getElementById('smlouvy-content').innerHTML = '<div class="text-center py-4 text-red-500">Chyba při načítání smluv.</div>';
+            }
+        };
+
+        xhr.onerror = function() {
+            document.getElementById('smlouvy-content').innerHTML = '<div class="text-center py-4 text-red-500">Chyba připojení k serveru.</div>';
+        };
+
+        xhr.send();
+    }
+
+    function closeSmlouvyModal() {
+        document.getElementById('smlouvyModal').classList.add('hidden');
     }
 </script>
 

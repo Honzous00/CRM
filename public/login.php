@@ -14,6 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (check_login($username, $password)) {
         $_SESSION['user_id'] = $username;
+        $_SESSION['LAST_ACTIVITY'] = time(); // Nastavení času přihlášení
         header('Location: index.php');
         exit;
     } else {

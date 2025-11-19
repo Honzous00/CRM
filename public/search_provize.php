@@ -13,6 +13,7 @@ $sql_provize = "
         provize.castka,
         provize.stornovana,
         provize.storno_rezerva,
+        provize.predavaci_dokument_cislo,
         provize.cislo_vypisu,
         provize.stupen_vyplaceni,
         provize.datum_vytvoreni,
@@ -47,13 +48,13 @@ $result_provize = $stmt->get_result();
         <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-100">
                 <tr>
-                    <!-- <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th> -->
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Klient</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Číslo smlouvy</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Datum výplaty</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Částka</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stornována</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stornorezerva</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Předávací dokument</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Číslo výpisu</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stupeň vyplácení</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vytvořeno</th>
@@ -62,8 +63,7 @@ $result_provize = $stmt->get_result();
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
                 <?php while ($row = $result_provize->fetch_assoc()): ?>
-                    <tr>
-                        <!-- <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($row['id']); ?></td> -->
+                    <tr class="hover:bg-gray-100 transition-colors">
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($row['jmeno_klienta']); ?></td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($row['cislo_smlouvy']); ?></td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($row['datum_vyplaty']); ?></td>
@@ -72,6 +72,7 @@ $result_provize = $stmt->get_result();
                             <?php echo $row['stornovana'] ? '&#x2714;' : '&#x2718;'; ?>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($row['storno_rezerva']); ?></td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($row['predavaci_dokument_cislo']); ?></td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($row['cislo_vypisu']); ?></td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($row['stupen_vyplaceni']); ?></td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><?php echo date('d.m.Y', strtotime($row['datum_vytvoreni'])); ?></td>
@@ -83,6 +84,7 @@ $result_provize = $stmt->get_result();
                                 data-castka="<?php echo $row['castka']; ?>"
                                 data-stornovana="<?php echo $row['stornovana']; ?>"
                                 data-storno-rezerva="<?php echo $row['storno_rezerva']; ?>"
+                                data-predavaci-dokument-cislo="<?php echo $row['predavaci_dokument_cislo']; ?>"
                                 data-cislo-vypisu="<?php echo $row['cislo_vypisu']; ?>"
                                 data-stupen-vyplaceni="<?php echo $row['stupen_vyplaceni']; ?>">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block mr-1" viewBox="0 0 20 20" fill="currentColor">
@@ -105,7 +107,7 @@ $result_provize = $stmt->get_result();
         </table>
     </div>
 <?php else: ?>
-    <p class="text-gray-500">Žádné provize nebyly nalezeny.</p>
+    <p class="text-gray-500 text-center py-4">Žádné provize nebyly nalezeny.</p>
 <?php endif; ?>
 
 <?php

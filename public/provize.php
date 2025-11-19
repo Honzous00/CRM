@@ -19,25 +19,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $castka = $conn->real_escape_string($_POST['castka']);
     $stornovana = isset($_POST['stornovana']) ? 1 : 0;
     $storno_rezerva = $conn->real_escape_string($_POST['storno_rezerva']);
+    $predavaci_dokument_cislo = $conn->real_escape_string($_POST['predavaci_dokument_cislo']);
     $cislo_vypisu = $conn->real_escape_string($_POST['cislo_vypisu']);
     $stupen_vyplaceni = $conn->real_escape_string($_POST['stupen_vyplaceni']);
+
+    //until this
 
     if ($action === 'update' && isset($_POST['provize_id'])) {
         // UPDATE existující provize
         $provize_id = $conn->real_escape_string($_POST['provize_id']);
-        $sql = "UPDATE provize SET smlouva_id=?, datum_vyplaty=?, castka=?, stornovana=?, storno_rezerva=?, cislo_vypisu=?, stupen_vyplaceni=? WHERE id=?";
+        $sql = "UPDATE provize SET smlouva_id=?, datum_vyplaty=?, castka=?, stornovana=?, storno_rezerva=?, predavaci_dokument_cislo=?, cislo_vypisu=?, stupen_vyplaceni=? WHERE id=?";
         $stmt = $conn->prepare($sql);
-        $stmt->bind_param("isdidsii", $smlouva_id, $datum_vyplaty, $castka, $stornovana, $storno_rezerva, $cislo_vypisu, $stupen_vyplaceni, $provize_id);
+        $stmt->bind_param("isdidssii", $smlouva_id, $datum_vyplaty, $castka, $stornovana, $storno_rezerva, $predavaci_dokument_cislo, $cislo_vypisu, $stupen_vyplaceni, $provize_id);
 
         if ($stmt->execute()) {
-            // Zpracování předávacího dokumentu
-            if (isset($_POST['cislo_vypisu'])) {
-                $cislo_vypisu_clean = trim($_POST['cislo_vypisu']);
-                if (!empty($cislo_vypisu_clean)) {
+            // Zpracování předávacího dokumentu - POUZE pro predavaci_dokument_cislo
+            if (isset($_POST['predavaci_dokument_cislo'])) {
+                $predavaci_dokument_cislo_clean = trim($_POST['predavaci_dokument_cislo']);
+                if (!empty($predavaci_dokument_cislo_clean)) {
                     // Najdi nebo vytvoř předávací dokument
                     $sql_find = "SELECT id FROM predavaci_dokumenty WHERE cislo = ?";
                     $stmt_find = $conn->prepare($sql_find);
-                    $stmt_find->bind_param("s", $cislo_vypisu_clean);
+                    $stmt_find->bind_param("s", $predavaci_dokument_cislo_clean);
                     $stmt_find->execute();
                     $result_find = $stmt_find->get_result();
 
@@ -47,7 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } else {
                         $sql_insert = "INSERT INTO predavaci_dokumenty (cislo) VALUES (?)";
                         $stmt_insert = $conn->prepare($sql_insert);
-                        $stmt_insert->bind_param("s", $cislo_vypisu_clean);
+                        $stmt_insert->bind_param("s", $predavaci_dokument_cislo_clean);
                         $stmt_insert->execute();
                         $predavaci_dokument_id = $stmt_insert->insert_id;
                         $stmt_insert->close();
@@ -61,7 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $stmt_update_smlouva->execute();
                     $stmt_update_smlouva->close();
                 } else {
-                    // Číslo výpisu je prázdné - odpoj smlouvu od předávacího dokumentu
+                    // Číslo předávacího dokumentu je prázdné - odpoj smlouvu od předávacího dokumentu
                     $sql_update_smlouva = "UPDATE smlouvy SET predavaci_dokument_id = NULL WHERE id = ?";
                     $stmt_update_smlouva = $conn->prepare($sql_update_smlouva);
                     $stmt_update_smlouva->bind_param("i", $smlouva_id);
@@ -80,9 +83,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     } else {
         // INSERT nové provize
-        $sql = "INSERT INTO provize (smlouva_id, datum_vyplaty, castka, stornovana, storno_rezerva, cislo_vypisu, stupen_vyplaceni) VALUES (?, ?, ?, ?, ?, ?, ?)";
+        $sql = "INSERT INTO provize (smlouva_id, datum_vyplaty, castka, stornovana, storno_rezerva, predavaci_dokument_cislo, cislo_vypisu, stupen_vyplaceni) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
         $stmt = $conn->prepare($sql);
-        $stmt->bind_param("isdidsi", $smlouva_id, $datum_vyplaty, $castka, $stornovana, $storno_rezerva, $cislo_vypisu, $stupen_vyplaceni);
+        $stmt->bind_param("isdidssi", $smlouva_id, $datum_vyplaty, $castka, $stornovana, $storno_rezerva, $predavaci_dokument_cislo, $cislo_vypisu, $stupen_vyplaceni);
 
         if ($stmt->execute()) {
             // Zpracování předávacího dokumentu
@@ -175,6 +178,7 @@ $sql_provize = "
         provize.castka,
         provize.stornovana,
         provize.storno_rezerva,
+        provize.predavaci_dokument_cislo,
         provize.cislo_vypisu,
         provize.stupen_vyplaceni,
         provize.datum_vytvoreni,
@@ -251,6 +255,7 @@ $count_results = $result_provize->num_rows;
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Částka</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stornována</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stornorezerva</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Předávací dokument</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Číslo výpisu</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stupeň vyplácení</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vytvořeno</th>
@@ -273,6 +278,16 @@ $count_results = $result_provize->num_rows;
                                         <?php if (!empty($row['predavaci_dokument'])): ?>
                                             <a href="predavaci_dokumenty.php?id=<?php echo $row['predavaci_dokument_id']; ?>"
                                                 class="text-blue-600 hover:text-blue-800 transition-colors duration-200">
+                                                <?php echo htmlspecialchars($row['predavaci_dokument_cislo']); ?>
+                                            </a>
+                                        <?php else: ?>
+                                            <?php echo htmlspecialchars($row['predavaci_dokument_cislo']); ?>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                        <?php if (!empty($row['cislo_vypisu'])): ?>
+                                            <a href="cislo_vypisu.php?cislo=<?php echo urlencode($row['cislo_vypisu']); ?>"
+                                                class="text-green-600 hover:text-green-800 transition-colors duration-200">
                                                 <?php echo htmlspecialchars($row['cislo_vypisu']); ?>
                                             </a>
                                         <?php else: ?>
@@ -289,6 +304,7 @@ $count_results = $result_provize->num_rows;
                                             data-castka="<?php echo $row['castka']; ?>"
                                             data-stornovana="<?php echo $row['stornovana']; ?>"
                                             data-storno-rezerva="<?php echo $row['storno_rezerva']; ?>"
+                                            data-predavaci-dokument-cislo="<?php echo $row['predavaci_dokument_cislo']; ?>"
                                             data-cislo-vypisu="<?php echo $row['cislo_vypisu']; ?>"
                                             data-stupen-vyplaceni="<?php echo $row['stupen_vyplaceni']; ?>">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block mr-1" viewBox="0 0 20 20" fill="currentColor">
@@ -403,9 +419,15 @@ $count_results = $result_provize->num_rows;
                     </div>
 
                     <div class="mb-4">
-                        <label for="cislo_vypisu" class="block text-sm font-medium text-gray-700">Číslo výpisu</label>
-                        <input type="number" id="cislo_vypisu" name="cislo_vypisu" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2">
+                        <label for="predavaci_dokument_cislo" class="block text-sm font-medium text-gray-700">Předávací dokument</label>
+                        <input type="text" id="predavaci_dokument_cislo" name="predavaci_dokument_cislo" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2">
                     </div>
+
+                    <div class="mb-4">
+                        <label for="cislo_vypisu" class="block text-sm font-medium text-gray-700">Číslo výpisu</label>
+                        <input type="text" id="cislo_vypisu" name="cislo_vypisu" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2">
+                    </div>
+
                     <div class="mb-4">
                         <label for="stupen_vyplaceni" class="block text-sm font-medium text-gray-700">Stupeň vyplácení</label>
                         <select id="stupen_vyplaceni" name="stupen_vyplaceni" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2">
@@ -443,6 +465,41 @@ $count_results = $result_provize->num_rows;
         const searchInput = document.getElementById('search');
         let searchTimeout;
 
+        // Event delegation pro editaci a mazání (funguje i pro dynamicky načtený obsah)
+        document.getElementById('commissions-table-container').addEventListener('click', function(e) {
+            // Editace
+            if (e.target.closest('.edit-btn')) {
+                const button = e.target.closest('.edit-btn');
+                modalTitle.textContent = 'Upravit provizi';
+                formAction.value = 'update';
+
+                // Naplnění formuláře daty
+                provizeIdInput.value = button.getAttribute('data-id');
+                smlouvaSelect.value = button.getAttribute('data-smlouva-id');
+                document.getElementById('datum_vyplaty').value = button.getAttribute('data-datum-vyplaty');
+                document.getElementById('castka').value = button.getAttribute('data-castka');
+                document.getElementById('stornovana').checked = button.getAttribute('data-stornovana') === '1';
+                document.getElementById('storno_rezerva').value = button.getAttribute('data-storno-rezerva');
+                document.getElementById('predavaci_dokument_cislo').value = button.getAttribute('data-predavaci-dokument-cislo');
+                document.getElementById('cislo_vypisu').value = button.getAttribute('data-cislo-vypisu');
+                document.getElementById('stupen_vyplaceni').value = button.getAttribute('data-stupen-vyplaceni');
+
+                // Načtení detailů smlouvy
+                loadSmlouvaDetails(button.getAttribute('data-smlouva-id'));
+
+                modal.classList.remove('hidden');
+            }
+
+            // Mazání
+            if (e.target.closest('.delete-btn')) {
+                const link = e.target.closest('.delete-btn');
+                const confirmMessage = link.getAttribute('data-confirm');
+                if (!confirm(confirmMessage)) {
+                    e.preventDefault();
+                }
+            }
+        });
+
         searchInput.addEventListener('input', function() {
             clearTimeout(searchTimeout);
             const query = this.value.trim();
@@ -453,7 +510,7 @@ $count_results = $result_provize->num_rows;
 
             searchTimeout = setTimeout(() => {
                 searchCommissions(query);
-            }, 300); // Zpoždění 300ms pro optimalizaci
+            }, 300);
         });
 
         function searchCommissions(query) {
@@ -470,17 +527,24 @@ $count_results = $result_provize->num_rows;
 
                     if (query) {
                         searchInfo.innerHTML = `
-                            <p class="text-sm text-gray-500 mt-1">
-                                Vyhledávání: <span class="font-bold text-blue-600">"${query}"</span>
-                                (nalezeno: <span class="font-bold text-blue-600">${resultCount}</span>)
-                            </p>
-                        `;
+                        <p class="text-sm text-gray-500 mt-1">
+                            Vyhledávání: <span class="font-bold text-blue-600">"${query}"</span>
+                            (nalezeno: <span class="font-bold text-blue-600">${resultCount}</span>)
+                        </p>
+                    `;
                     } else {
                         searchInfo.innerHTML = '';
                     }
 
-                    // Znovu připojit event listenery pro editaci a mazání
-                    attachEventListeners();
+                    // Přidat historii URL pro možnost sdílení vyhledávání
+                    const url = new URL(window.location);
+                    if (query) {
+                        url.searchParams.set('search', query);
+                    } else {
+                        url.searchParams.delete('search');
+                    }
+                    window.history.replaceState({}, '', url);
+
                 } else {
                     document.getElementById('commissions-table-container').innerHTML = '<div class="text-center py-4 text-red-500">Chyba při načítání dat.</div>';
                 }
@@ -493,39 +557,12 @@ $count_results = $result_provize->num_rows;
             xhr.send();
         }
 
-        function attachEventListeners() {
-            // Připojit event listenery pro tlačítka editace
-            document.querySelectorAll('.edit-btn').forEach(button => {
-                button.addEventListener('click', function() {
-                    modalTitle.textContent = 'Upravit provizi';
-                    formAction.value = 'update';
-
-                    // Naplnění formuláře daty
-                    provizeIdInput.value = this.getAttribute('data-id');
-                    smlouvaSelect.value = this.getAttribute('data-smlouva-id');
-                    document.getElementById('datum_vyplaty').value = this.getAttribute('data-datum-vyplaty');
-                    document.getElementById('castka').value = this.getAttribute('data-castka');
-                    document.getElementById('stornovana').checked = this.getAttribute('data-stornovana') === '1';
-                    document.getElementById('storno_rezerva').value = this.getAttribute('data-storno-rezerva');
-                    document.getElementById('cislo_vypisu').value = this.getAttribute('data-cislo-vypisu');
-                    document.getElementById('stupen_vyplaceni').value = this.getAttribute('data-stupen-vyplaceni');
-
-                    // Načtení detailů smlouvy
-                    loadSmlouvaDetails(this.getAttribute('data-smlouva-id'));
-
-                    modal.classList.remove('hidden');
-                });
-            });
-
-            // Připojit event listenery pro mazání
-            document.querySelectorAll('.delete-btn').forEach(link => {
-                link.addEventListener('click', function(e) {
-                    const confirmMessage = this.getAttribute('data-confirm');
-                    if (!confirm(confirmMessage)) {
-                        e.preventDefault();
-                    }
-                });
-            });
+        // Načíst vyhledávací parametr z URL při načtení stránky
+        const urlParams = new URLSearchParams(window.location.search);
+        const searchParam = urlParams.get('search');
+        if (searchParam) {
+            searchInput.value = searchParam;
+            searchCommissions(searchParam);
         }
 
         // Otevření modálního okna pro přidání
@@ -585,9 +622,6 @@ $count_results = $result_provize->num_rows;
         smlouvaSelect.addEventListener('change', function() {
             loadSmlouvaDetails(this.value);
         });
-
-        // Připojit event listenery pro stávající řádky
-        attachEventListeners();
     });
 </script>
 

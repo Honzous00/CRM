@@ -24,6 +24,38 @@ require_login();
 include_once __DIR__ . '/../app/includes/header.php';
 include_once __DIR__ . '/../app/includes/db_connect.php';
 
+// PŘIDAT: Import CSS souboru pro dropdown dokumentů
+echo '<link rel="stylesheet" href="css/documents-dropdown.css">';
+
+// PŘIDAT: Důležité inline CSS pro opravu z-index
+echo '<style>
+    /* Resetovat všechny potenciální problémy s pozicováním */
+    .documents-dropdown {
+        position: fixed !important;
+        z-index: 10001 !important;
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 0.375rem;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        max-height: 300px;
+        overflow-y: auto;
+    }
+    
+    /* Zajistit, aby dropdown zůstal nad vším */
+    body {
+        position: relative;
+    }
+    
+    /* Opravit pro tabulku - zajistit, že nebude blokovat */
+    .bg-white {
+        position: static !important;
+    }
+    
+    .overflow-x-auto {
+        position: static !important;
+    }
+</style>';
+
 // Načtení controllerů a view
 include_once __DIR__ . '/../app/controllers/smlouvy_controller.php';
 include_once __DIR__ . '/../app/views/smlouvy_view.php';
@@ -114,58 +146,10 @@ if (function_exists('displayEditModal')) {
 ?>
 
 <script>
-    let dokumentCounter = 1;
-
-    function addDokument() {
-        const container = document.getElementById('dokumenty-container');
-        const newRow = document.createElement('div');
-        newRow.className = 'dokument-row mb-4 p-4 border border-gray-200 rounded-lg bg-white';
-        newRow.innerHTML = `
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-                <label class="block text-sm font-medium text-gray-700">Typ dokumentu *</label>
-                <input type="text" name="dokument_typ[${dokumentCounter}]" list="typy-dokumentu" 
-                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2 dokument-typ"
-                       placeholder="Začněte psát pro návrhy..." required>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700">Soubor *</label>
-                <input type="file" name="dokument_soubor[${dokumentCounter}]" 
-                       class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                       accept=".pdf,.jpg,.jpeg,.png,.gif" required>
-                <p class="text-xs text-gray-500 mt-1">PDF, JPG, PNG, GIF (max. 10MB)</p>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700">Popis</label>
-                <input type="text" name="dokument_popis[${dokumentCounter}]" 
-                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2"
-                       placeholder="Volitelný popis...">
-                <button type="button" onclick="removeDokument(this)" class="mt-2 text-red-600 hover:text-red-800 text-sm">Odstranit</button>
-            </div>
-        </div>
-    `;
-        container.appendChild(newRow);
-        dokumentCounter++;
-    }
-
-    function removeDokument(button) {
-        const row = button.closest('.dokument-row');
-        if (document.querySelectorAll('.dokument-row').length > 1) {
-            row.remove();
-        } else {
-            row.querySelectorAll('input').forEach(input => {
-                if (input.type !== 'file') {
-                    input.value = '';
-                }
-            });
-            row.querySelector('input[type="file"]').value = '';
-        }
-    }
-
     document.addEventListener('DOMContentLoaded', function() {
         console.log('DOM loaded - initializing modal functionality');
 
-        // ✅ VYLEPŠENÁ VALIDACE - STEJNÁ JAKO V PŘEDCHOZÍM FUNKČNÍM KÓDU
+        // ✅ VYLEPŠENÁ VALIDACE
         function showError(fieldId, message) {
             const errorElement = document.getElementById(fieldId + '_error');
             const fieldElement = document.getElementById(fieldId);
@@ -452,24 +436,7 @@ if (function_exists('displayEditModal')) {
                 editModal.classList.add('hidden');
             });
         }
-        /*
-                // Zavření modálního okna při kliknutí mimo obsah
-                if (addModal) {
-                    addModal.addEventListener('click', function(e) {
-                        if (e.target === addModal) {
-                            addModal.classList.add('hidden');
-                        }
-                    });
-                }
 
-                if (editModal) {
-                    editModal.addEventListener('click', function(e) {
-                        if (e.target === editModal) {
-                            editModal.classList.add('hidden');
-                        }
-                    });
-                }
-        */
         // Zpracování tlačítek pro editaci v tabulce
         document.querySelectorAll('.edit-btn').forEach(button => {
             button.addEventListener('click', async function() {
@@ -764,7 +731,6 @@ if (function_exists('displayEditModal')) {
             });
         }
 
-
         // Otevření modálního okna pro přidání
         if (openAddModalBtn && addModal) {
             openAddModalBtn.addEventListener('click', () => {
@@ -793,30 +759,226 @@ if (function_exists('displayEditModal')) {
 
         console.log('Modal functionality initialized');
 
+        // V public/smlouvy.php nahraďte celou funkci initializeDocumentsDropdown tímto kódem:
 
-        // Inicializace dokumentů pro přidání
-        const addModalBtn = document.getElementById('open-add-modal-btn');
-        if (addModalBtn) {
-            addModalBtn.addEventListener('click', function() {
-                dokumentCounter = 1;
+        function initializeDocumentsDropdown() {
+            console.log('Initializing documents dropdown functionality...');
+
+            const dropdownButtons = document.querySelectorAll('.documents-dropdown-btn');
+            console.log(`Found ${dropdownButtons.length} document dropdown buttons`);
+
+            dropdownButtons.forEach(button => {
+                button.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('Dropdown button clicked');
+
+                    const smlouvaId = this.getAttribute('data-smlouva-id');
+                    const dropdown = document.getElementById(`documents-dropdown-${smlouvaId}`);
+
+                    if (!dropdown) {
+                        console.error(`Dropdown not found for smlouva ID: ${smlouvaId}`);
+                        return;
+                    }
+
+                    // Skrýt všechny ostatní dropdowny
+                    document.querySelectorAll('.documents-dropdown').forEach(menu => {
+                        if (menu !== dropdown) {
+                            menu.classList.add('hidden');
+                        }
+                    });
+
+                    // Přepnout zobrazení aktuálního dropdownu
+                    const isHidden = dropdown.classList.contains('hidden');
+                    dropdown.classList.toggle('hidden');
+
+                    if (!isHidden) {
+                        adjustDropdownPosition(dropdown, this);
+                    }
+                });
+            });
+
+            // Skrýt dropdowny při kliknutí mimo
+            document.addEventListener('click', function(e) {
+                if (!e.target.closest('.documents-container') && !e.target.closest('.documents-dropdown')) {
+                    document.querySelectorAll('.documents-dropdown').forEach(menu => {
+                        menu.classList.add('hidden');
+                    });
+                }
+            });
+
+            function adjustDropdownPosition(dropdown, button) {
+                const buttonRect = button.getBoundingClientRect();
+                const dropdownRect = dropdown.getBoundingClientRect();
+                const viewportHeight = window.innerHeight;
+                const viewportWidth = window.innerWidth;
+
+                // Resetovat pozici
+                dropdown.style.position = 'fixed';
+                dropdown.style.top = '';
+                dropdown.style.bottom = '';
+                dropdown.style.left = '';
+                dropdown.style.right = '';
+
+                // Vypočítat pozici - ZÁKLADNÍ A SPOLEHLIVÝ VÝPOČET
+                let top = buttonRect.bottom + window.scrollY;
+                let left = buttonRect.left + window.scrollX;
+
+                // Vertikální pozicování - zkontrolovat, zda je dostatek místa dole
+                const spaceBelow = viewportHeight - buttonRect.bottom - 20;
+                const estimatedHeight = 200; // Přibližná výška dropdownu
+
+                if (spaceBelow < estimatedHeight) {
+                    // Pokud není dostatek místa dole, zobrazit nad tlačítkem
+                    top = buttonRect.top + window.scrollY - estimatedHeight - 5;
+                } else {
+                    // Pokud je místo dole, zobrazit pod tlačítkem
+                    top = buttonRect.bottom + window.scrollY + 5;
+                }
+
+                // Horizontální pozicování - zkontrolovat, zda je dostatek místa vpravo
+                const estimatedWidth = 250; // Přibližná šířka dropdownu
+                const spaceRight = viewportWidth - buttonRect.left - 20;
+
+                if (spaceRight < estimatedWidth) {
+                    // Pokud není dostatek místa vpravo, zarovnat vpravo
+                    left = buttonRect.right + window.scrollX - estimatedWidth;
+                } else {
+                    // Pokud je místo vpravo, zarovnat vlevo
+                    left = buttonRect.left + window.scrollX;
+                }
+
+                // Omezení na hranice viewportu
+                top = Math.max(10, Math.min(top, viewportHeight + window.scrollY - estimatedHeight - 10));
+                left = Math.max(10, Math.min(left, viewportWidth + window.scrollX - estimatedWidth - 10));
+
+                // Aplikovat pozici
+                dropdown.style.top = top + 'px';
+                dropdown.style.left = left + 'px';
+                dropdown.style.zIndex = '10001';
+            }
+
+            window.addEventListener('resize', function() {
+                document.querySelectorAll('.documents-dropdown').forEach(dropdown => {
+                    if (!dropdown.classList.contains('hidden')) {
+                        const smlouvaId = dropdown.id.replace('documents-dropdown-', '');
+                        const button = document.querySelector(`.documents-dropdown-btn[data-smlouva-id="${smlouvaId}"]`);
+                        if (button) {
+                            adjustDropdownPosition(dropdown, button);
+                        }
+                    }
+                });
+            });
+
+            console.log('Documents dropdown functionality initialized successfully');
+        }
+
+        // Inicializovat dropdowny dokumentů
+        initializeDocumentsDropdown();
+        // Real-time vyhledávání pro smlouvy
+        const searchInput = document.getElementById('search');
+        let searchTimeout;
+
+        searchInput.addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            const query = this.value.trim();
+
+            // Zobrazit indikátor načítání
+            const tableContainer = document.getElementById('contracts-table-container');
+            tableContainer.innerHTML = '<div class="text-center py-4">Načítání...</div>';
+
+            searchTimeout = setTimeout(() => {
+                searchContracts(query);
+            }, 300);
+        });
+
+        function searchContracts(query) {
+            const xhr = new XMLHttpRequest();
+            xhr.open('GET', 'search_smlouvy.php?search=' + encodeURIComponent(query), true);
+
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    document.getElementById('contracts-table-container').innerHTML = xhr.responseText;
+
+                    // Aktualizovat informace o vyhledávání
+                    const searchInfo = document.getElementById('search-info');
+                    const resultCount = document.querySelectorAll('#contracts-table-container tbody tr').length;
+
+                    if (query) {
+                        searchInfo.innerHTML = `
+                    <p class="text-sm text-gray-500 mt-1">
+                        Vyhledávání: <span class="font-bold text-blue-600">"${query}"</span>
+                        (nalezeno: <span class="font-bold text-blue-600">${resultCount}</span>)
+                    </p>
+                `;
+                    } else {
+                        searchInfo.innerHTML = '';
+                    }
+
+                    // Přidat historii URL pro možnost sdílení vyhledávání
+                    const url = new URL(window.location);
+                    if (query) {
+                        url.searchParams.set('search', query);
+                    } else {
+                        url.searchParams.delete('search');
+                    }
+                    window.history.replaceState({}, '', url);
+
+                    // Znovu inicializovat event listenery pro nově načtené řádky
+                    initializeEditButtons();
+                    initializeDeleteForms();
+                    initializeDocumentsDropdown();
+
+                } else {
+                    document.getElementById('contracts-table-container').innerHTML = '<div class="text-center py-4 text-red-500">Chyba při načítání dat.</div>';
+                }
+            };
+
+            xhr.onerror = function() {
+                document.getElementById('contracts-table-container').innerHTML = '<div class="text-center py-4 text-red-500">Chyba připojení k serveru.</div>';
+            };
+
+            xhr.send();
+        }
+
+        // Načíst vyhledávací parametr z URL při načtení stránky
+        const urlParams = new URLSearchParams(window.location.search);
+        const searchParam = urlParams.get('search');
+        if (searchParam) {
+            searchInput.value = searchParam;
+            searchContracts(searchParam);
+        }
+        // Funkce pro inicializaci event listenerů
+        function initializeEditButtons() {
+            // Event delegation pro editaci
+            document.getElementById('contracts-table-container').addEventListener('click', function(e) {
+                if (e.target.closest('.edit-btn')) {
+                    const button = e.target.closest('.edit-btn');
+                    const row = button.closest('tr');
+                    const data = row.dataset;
+
+                    // Zavoláme existující funkci pro otevření editace
+                    openEditModal(data);
+                }
             });
         }
 
-        // Inicializace dokumentů pro editaci
-        document.querySelectorAll('.edit-btn').forEach(button => {
-            button.addEventListener('click', function() {
-                dokumentCounter = 1;
-                // Zde můžete načíst existující dokumenty pro editaci pomocí AJAXu
+        function initializeDeleteForms() {
+            // Event delegation pro mazání
+            document.getElementById('contracts-table-container').addEventListener('click', function(e) {
+                if (e.target.closest('.delete-form')) {
+                    const form = e.target.closest('.delete-form');
+                    const confirmMessage = form.getAttribute('data-confirm');
+                    if (!confirm(confirmMessage)) {
+                        e.preventDefault();
+                    }
+                }
             });
-        });
+        }
 
-        // Inicializace při načtení stránky
-        document.addEventListener('DOMContentLoaded', function() {
-            // Resetovat počítadlo při otevření modálního okna
-            document.getElementById('open-add-modal-btn').addEventListener('click', function() {
-                okumentCounter = 1;
-            });
-        });
+        // Inicializovat event listenery při načtení stránky
+        initializeEditButtons();
+        initializeDeleteForms();
     });
 </script>
 

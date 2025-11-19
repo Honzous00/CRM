@@ -10,10 +10,16 @@
     <script src="https://cdn.tailwindcss.com"></script>
 
     <!-- Váš vlastní CSS soubor -->
-    <link rel="stylesheet" href="/public/css/style.css">
+    <link rel="stylesheet" href="../public/css/style.css">
 </head>
 
 <body class="bg-gray-100 min-h-screen flex flex-col">
+    <!-- Timer pro odpočet do odhlášení -->
+
+    <div id="logoutTimer" class="bg-blue-500 text-white py-2 px-4 text-center text-sm font-medium">
+        <span id="timerText">Automatické odhlášení za: <span id="countdownTimer">načítání...</span></span>
+    </div>
+
     <header class="bg-blue-600 text-white p-4 shadow-lg">
         <div class="container mx-auto flex justify-between items-center">
             <a href="../public/index.php" class="text-2xl font-bold">Můj CMS</a>
@@ -23,6 +29,7 @@
                     <li><a href="../public/smlouvy.php" class="hover:text-blue-200 transition-colors duration-200">Smlouvy</a></li>
                     <li><a href="../public/provize.php" class="hover:text-blue-200 transition-colors duration-200">Provize</a></li>
                     <li><a href="../public/predavaci_dokumenty.php" class="hover:text-blue-200 transition-colors duration-200">Předávací dokumenty</a></li>
+                    <li><a href="../public/cislo_vypisu.php" class="hover:text-blue-200 transition-colors duration-200">Výpis provizí</a></li>
                     <li><a href="../public/produkty.php" class="hover:text-blue-200 transition-colors duration-200">Produkty</a></li>
                     <li><a href="../public/pojistovny.php" class="hover:text-blue-200 transition-colors duration-200">Pojišťovny</a></li>
                     <li><a href="../public/logout.php" class="hover:text-blue-200 transition-colors duration-200">Odhlášení</a></li>
@@ -32,3 +39,9 @@
     </header>
 
     <main class="flex-grow">
+
+        <!-- Načtení JavaScriptu na konci stránky -->
+        <script src="../public/js/autologout.js?v=<?php echo filemtime(__DIR__ . '/../../public/js/autologout.js'); ?>"></script>
+</body>
+
+</html>

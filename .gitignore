@@ -5,5 +5,6 @@ testing/
 backup/
 uploads/
 !uploads/.gitkeep
+!uploads/predavaci_dokumenty/.gitkeep
 debug_upload.php
 logs/

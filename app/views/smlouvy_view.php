@@ -49,11 +49,47 @@ function displaySmlouvyTable($smlouvy, $conn)
                             <?php
                             if ($row['podminky_produktu']) {
                                 $podminky = json_decode($row['podminky_produktu'], true);
-                                if (is_array($podminky)) {
-                                    foreach ($podminky as $klic => $hodnota) {
-                                        echo '<strong>' . htmlspecialchars($klic) . ':</strong> ' . htmlspecialchars($hodnota) . '<br>';
-                                    }
+                                if (is_array($podminky) && !empty(array_filter($podminky))) {
+                            ?>
+                                    <div class="relative inline-block group">
+                                        <button type="button"
+                                            class="inline-flex items-center text-blue-600 hover:text-blue-800 transition-colors duration-200"
+                                            title="Zobrazit podrobnosti">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                            </svg>
+                                            <span class="ml-1">Specifika</span>
+                                        </button>
+
+                                        <!-- CSS Tooltip -->
+                                        <div class="absolute invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-all duration-200 bottom-full left-1/2 transform -translate-x-1/2 mb-2 z-50">
+                                            <div class="bg-white rounded-lg shadow-xl border border-gray-200 p-4 max-w-sm relative">
+                                                <div class="text-sm text-gray-700 space-y-2">
+                                                    <?php
+                                                    foreach ($podminky as $klic => $hodnota) {
+                                                        if (!empty($hodnota) && $hodnota !== 'Ne') {
+                                                            $displayKey = ucfirst(str_replace('_', ' ', $klic));
+                                                            echo '<div class="flex justify-between">';
+                                                            echo '<span class="font-medium">' . htmlspecialchars($displayKey) . ':</span>';
+                                                            echo '<span class="ml-2">' . htmlspecialchars($hodnota) . '</span>';
+                                                            echo '</div>';
+                                                        }
+                                                    }
+                                                    ?>
+                                                </div>
+                                                <!-- Šipka -->
+                                                <div class="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
+                                                    <div class="w-4 h-4 bg-white border-r border-b border-gray-200 transform rotate-45"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                            <?php
+                                } else {
+                                    echo '<span class="text-gray-400">-</span>';
                                 }
+                            } else {
+                                echo '<span class="text-gray-400">-</span>';
                             }
                             ?>
                         </td>
@@ -61,28 +97,90 @@ function displaySmlouvyTable($smlouvy, $conn)
                             <?php echo $row['zaznam_zeteo'] ? '&#x2714;' : '&#x2718;'; ?>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            <?php if (!empty($row['cesta_k_souboru'])): ?>
-                                <div class="flex flex-col">
-                                    <a href="<?php echo htmlspecialchars($row['cesta_k_souboru']); ?>" target="_blank"
-                                        class="text-blue-600 hover:text-blue-800 transition-colors duration-200 mb-1">
-                                        📄 Hlavní smlouva
-                                    </a>
-                                    <?php
-                                    // Načtení příloh
-                                    $dokumentyModel = new DokumentyModel($conn);
-                                    $dokumenty = $dokumentyModel->getDokumentyBySmlouva($row['id']);
-                                    foreach ($dokumenty as $dokument):
-                                        if ($dokument['typ_dokumentu'] !== 'Smlouva'): ?>
-                                            <a href="<?php echo htmlspecialchars($dokument['cesta_k_souboru']); ?>" target="_blank"
-                                                class="text-green-600 hover:text-green-800 transition-colors duration-200 text-xs">
-                                                📎 <?php echo htmlspecialchars($dokument['typ_dokumentu']); ?>
-                                            </a>
-                                    <?php endif;
-                                    endforeach; ?>
+                            <?php
+                            $dokumentyModel = new DokumentyModel($conn);
+                            $dokumenty = $dokumentyModel->getDokumentyBySmlouva($row['id']);
+                            $vsechnyDokumenty = [];
+
+                            // Přidání hlavní smlouvy
+                            if (!empty($row['cesta_k_souboru'])) {
+                                $vsechnyDokumenty[] = [
+                                    'nazev' => 'Hlavní smlouva',
+                                    'cesta' => $row['cesta_k_souboru'],
+                                    'typ' => 'Smlouva'
+                                ];
+                            }
+
+                            // Přidání dalších dokumentů
+                            foreach ($dokumenty as $dokument) {
+                                if ($dokument['typ_dokumentu'] !== 'Smlouva' && !empty($dokument['cesta_k_souboru'])) {
+                                    $vsechnyDokumenty[] = [
+                                        'nazev' => $dokument['typ_dokumentu'],
+                                        'cesta' => $dokument['cesta_k_souboru'],
+                                        'typ' => $dokument['typ_dokumentu']
+                                    ];
+                                }
+                            }
+
+                            $pocetDokumentu = count($vsechnyDokumenty);
+
+                            if ($pocetDokumentu === 0) {
+                                echo 'N/A';
+                            } elseif ($pocetDokumentu === 1) {
+                                // Pokud je jen jeden dokument - přímý odkaz
+                                $dokument = $vsechnyDokumenty[0];
+                                echo '<a href="' . htmlspecialchars($dokument['cesta']) . '" target="_blank" 
+                class="text-blue-600 hover:text-blue-800 transition-colors duration-200 flex items-center"
+                title="' . htmlspecialchars($dokument['nazev']) . '">
+                <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+                Smlouva
+              </a>';
+                            } else {
+                                // Pokud je více dokumentů - dropdown menu
+                            ?>
+                                <div class="relative inline-block text-left documents-container">
+                                    <button type="button"
+                                        class="inline-flex items-center text-blue-600 hover:text-blue-800 transition-colors duration-200 documents-dropdown-btn"
+                                        data-smlouva-id="<?php echo $row['id']; ?>">
+                                        <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                        </svg>
+                                        Dokumenty (<?php echo $pocetDokumentu; ?>)
+                                        <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                        </svg>
+                                    </button>
+                                    <!-- dokud se tohle nesmaže, tak vracej -->
+                                    <div id="documents-dropdown-<?php echo $row['id']; ?>"
+                                        class="hidden absolute left-0 mt-2 w-64 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 documents-dropdown"
+                                        style="position: absolute; z-index: 10001; background: white;">
+                                        <div class="py-1 max-h-64 overflow-y-auto" role="menu" aria-orientation="vertical">
+                                            <?php foreach ($vsechnyDokumenty as $index => $dokument): ?>
+                                                <a href="<?php echo htmlspecialchars($dokument['cesta']); ?>"
+                                                    target="_blank"
+                                                    class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 flex items-center"
+                                                    role="menuitem"
+                                                    style="z-index: 10002; position: relative;">
+                                                    <svg class="w-4 h-4 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                                    </svg>
+                                                    <?php echo htmlspecialchars($dokument['nazev']); ?>
+                                                </a>
+                                                <?php if ($index < count($vsechnyDokumenty) - 1): ?>
+                                                    <div class="border-t border-gray-100 my-1"></div>
+                                                <?php endif; ?>
+                                            <?php endforeach; ?>
+                                        </div>
+                                    </div>
                                 </div>
-                            <?php else: ?>
-                                N/A
-                            <?php endif; ?>
+                            <?php
+                            }
+                            ?>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($row['poznamka']); ?></td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><?php echo date('d.m.Y', strtotime($row['datum_vytvoreni'])); ?></td>
@@ -109,6 +207,7 @@ function displaySmlouvyTable($smlouvy, $conn)
             </tbody>
         </table>
     </div>
+
 <?php
 }
 ?>

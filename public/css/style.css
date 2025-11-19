@@ -1,0 +1,21 @@
+/* Auto Logout Styles */
+#logoutTimer {
+  transition: background-color 0.3s ease;
+}
+
+/* Blikající animace pro posledních 10 sekund */
+@keyframes blink {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.bg-red-500 {
+  animation: blink 0.5s infinite;
+}
