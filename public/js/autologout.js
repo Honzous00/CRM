@@ -38,27 +38,35 @@ function startCountdown() {
 
 function updateDisplay() {
   const timerElement = document.getElementById("countdownTimer");
-  const container = document.getElementById("logoutTimer");
 
-  if (timerElement && container) {
-    const minutes = Math.floor(remainingTime / 60000);
-    const seconds = Math.floor((remainingTime % 60000) / 1000);
-    timerElement.textContent = `${minutes}:${seconds
-      .toString()
-      .padStart(2, "0")}`;
+  // Nový element li, který se obarvuje
+  const timerWrapper = document.getElementById("logoutTimerWrapper");
 
-    if (remainingTime <= warningTime) {
-      container.className =
-        "bg-orange-500 text-white py-2 px-4 text-center text-sm font-medium";
-    } else {
-      container.className =
-        "bg-blue-500 text-white py-2 px-4 text-center text-sm font-medium";
-    }
+  if (timerElement && timerWrapper) {
+    // Používáme Math.ceil k zaokrouhlování nahoru (i 0:01 se zobrazí jako "1 min")
+    const minutes = Math.ceil(remainingTime / 60000);
+
+    // Zobrazení: "M min"
+    timerElement.textContent = `${minutes}`;
+
+    // --- Logika pro barevný akcent na miniaturním timeru ---
+
+    // Odstraníme předchozí barvy pro čistotu
+    timerWrapper.classList.remove(
+      "bg-red-600/50",
+      "bg-orange-500/50",
+      "bg-blue-700/50"
+    );
 
     if (remainingTime <= 60000) {
-      container.classList.add("bg-red-500");
+      // Méně než 1 minuta (Kritický)
+      timerWrapper.classList.add("bg-red-600/50");
+    } else if (remainingTime <= warningTime) {
+      // V rámci 5 minut (Varování)
+      timerWrapper.classList.add("bg-orange-500/50");
     } else {
-      container.classList.remove("bg-red-500");
+      // Normální stav
+      timerWrapper.classList.add("bg-blue-700/50");
     }
   }
 }
@@ -69,7 +77,7 @@ function showWarning() {
     createWarningModal();
     warningModal = document.getElementById("autoLogoutWarning");
   }
-  warningModal.style.display = "block";
+  warningModal.style.display = "block"; // Změna zpět na block
   startModalCountdown();
 }
 
@@ -89,31 +97,40 @@ function createWarningModal() {
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0,0,0,0.5);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 10000;
+    background: rgba(0,0,0,0.7);
     display: none;
+    z-index: 10000;
   `;
 
   const modalContent = document.createElement("div");
   modalContent.style.cssText = `
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
     background: white;
-    padding: 30px;
-    border-radius: 10px;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    padding: 2rem;
+    border-radius: 12px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.3);
     text-align: center;
-    max-width: 400px;
+    max-width: 450px;
     width: 90%;
+    border: 3px solid #e53e3e;
   `;
 
   modalContent.innerHTML = `
-    <h3 style="color: #d32f2f; font-size: 1.5em; margin-bottom: 15px;">Varování</h3>
-    <p>Z důvodu nečinnosti budete automaticky odhlášeni za <span id="modalCountdown" style="font-weight: bold; color: #d32f2f;">5:00</span></p>
-    <div style="margin-top: 20px;">
-      <button id="stayLoggedIn" style="padding: 10px 20px; margin: 0 5px; background: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer;">Zůstat přihlášen</button>
-      <button id="logoutNow" style="padding: 10px 20px; margin: 0 5px; background: #f44336; color: white; border: none; border-radius: 5px; cursor: pointer;">Odhlásit se</button>
+    <h3 style="color: #d32f2f; font-size: 1.5rem; font-weight: bold; margin-bottom: 1rem;">Varování</h3>
+    <p style="margin-bottom: 1.5rem; font-size: 1.1rem; color: #4a5568;">
+      Z důvodu nečinnosti budete automaticky odhlášeni za 
+      <span id="modalCountdown" style="font-weight: bold; color: #d32f2f; font-size: 1.2rem;">5:00</span>
+    </p>
+    <div style="display: flex; gap: 12px; justify-content: center;">
+      <button id="stayLoggedIn" style="padding: 12px 24px; background: #48bb78; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; transition: all 0.2s;">
+        Zůstat přihlášen
+      </button>
+      <button id="logoutNow" style="padding: 12px 24px; background: #f56565; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; transition: all 0.2s;">
+        Odhlásit se
+      </button>
     </div>
   `;
 

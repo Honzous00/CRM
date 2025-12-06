@@ -4,7 +4,6 @@ include_once __DIR__ . '/../app/includes/login.php';
 require_login();
 
 // Vložení hlavičky a připojení k databázi
-include_once __DIR__ . '/../app/includes/header.php';
 include_once __DIR__ . '/../app/includes/db_connect.php';
 
 // Definice proměnných pro zprávy (úspěch/chyba)
@@ -139,6 +138,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     $stmt->close();
 }
+
+include_once __DIR__ . '/../app/includes/header.php';
 
 // Zpracování mazání provize
 if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['id'])) {

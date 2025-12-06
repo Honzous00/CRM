@@ -4,7 +4,6 @@ include_once __DIR__ . '/../app/includes/login.php';
 require_login();
 
 // Vložení hlavičky a připojení k databázi
-include_once __DIR__ . '/../app/includes/header.php';
 include_once __DIR__ . '/../app/includes/db_connect.php';
 
 // Definice proměnných pro zprávy (úspěch/chyba) a filtry
@@ -130,6 +129,8 @@ if (isset($_GET['action']) && $_GET['action'] == 'delete' && isset($_GET['id']))
         $error = "Chyba při mazání klienta: " . $e->getMessage();
     }
 }
+
+include_once __DIR__ . '/../app/includes/header.php';
 
 // Získání všech klientů s podporou vyhledávání
 $klienti = [];
