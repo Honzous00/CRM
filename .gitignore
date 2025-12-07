@@ -8,3 +8,4 @@ uploads/
 !uploads/predavaci_dokumenty/.gitkeep
 debug_upload.php
 logs/
+installed.lock
