@@ -209,22 +209,7 @@ $conn->set_charset("utf8mb4");
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     <style>
-        .step-circle {
-            @apply w-10 h-10 flex items-center justify-center rounded-full border-2 font-bold;
-        }
-
-        .step-line {
-            @apply flex-1 h-1 bg-gray-300 mx-2;
-        }
-
-        .requirement-ok {
-            color: #10B981;
-        }
-
-        .requirement-error {
-            color: #EF4444;
-        }
-
+        /* ŽÁDNÉ @apply - jen čisté CSS */
         .sql-preview {
             font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
             font-size: 12px;
@@ -234,6 +219,14 @@ $conn->set_charset("utf8mb4");
             padding: 10px;
             border-radius: 5px;
             border: 1px solid #ddd;
+        }
+
+        .requirement-ok {
+            color: #10B981;
+        }
+
+        .requirement-error {
+            color: #EF4444;
         }
     </style>
 </head>
@@ -246,18 +239,6 @@ $conn->set_charset("utf8mb4");
                 <i class="fas fa-cogs text-blue-600 mr-3"></i>Instalace CRM systému
             </h1>
             <p class="text-gray-600">Průvodce nastavením vašeho CRM systému</p>
-        </div>
-
-        <!-- Progress Steps -->
-        <div class="flex items-center justify-center mb-12">
-            <?php for ($i = 1; $i <= 3; $i++): ?>
-                <div class="step-circle <?php echo $i == $step ? 'bg-blue-600 text-white border-blue-600' : ($i < $step ? 'bg-green-500 text-white border-green-500' : 'bg-white text-gray-400 border-gray-300'); ?>">
-                    <?php echo $i; ?>
-                </div>
-                <?php if ($i < 3): ?>
-                    <div class="step-line <?php echo $i < $step ? 'bg-green-500' : ''; ?>"></div>
-                <?php endif; ?>
-            <?php endfor; ?>
         </div>
 
         <div class="text-center mb-8">
