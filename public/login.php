@@ -29,37 +29,136 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Přihlášení</title>
+    <title>Přihlášení - Můj CMS</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f3f4f6;
+        /* Definice barev pro snadné úpravy */
+        :root {
+            --soft-bg: #f0f2f5;
+            --accent-color: #4f46e5;
+            /* Indigo-600 */
+            --shadow-light: #ffffff;
+            --shadow-dark: #c8cacd;
+        }
+
+        /* 1. Neumorphism Pozadí (Soft Background) */
+        .neumorphism-bg {
+            background-color: var(--soft-bg);
+        }
+
+        /* 2. Neumorphic Karta (Popped out efekt) */
+        .neumorphic-card {
+            background-color: var(--soft-bg);
+            /* Dva stíny pro hloubku a 3D efekt */
+            box-shadow: 10px 10px 20px var(--shadow-dark),
+                -10px -10px 20px var(--shadow-light);
+        }
+
+        /* 3. Neumorphic Vstupní pole (Pushed in efekt) */
+        .neumorphic-input {
+            border: none;
+            background-color: var(--soft-bg);
+            /* Vnitřní stín pro "zapuštěný" pocit */
+            box-shadow: inset 4px 4px 8px var(--shadow-dark),
+                inset -4px -4px 8px var(--shadow-light);
+            transition: all 0.2s ease-in-out;
+        }
+
+        /* Zrušení stínu při focusu pro lepší čitelnost */
+        .neumorphic-input:focus {
+            box-shadow: none;
+            border: 1px solid var(--accent-color);
+        }
+
+        /* 4. Neumorphic Tlačítko (Popped out) */
+        .neumorphic-button {
+            background-color: var(--accent-color);
+            color: white;
+            /* Stejné stíny jako karta */
+            box-shadow: 6px 6px 12px var(--shadow-dark),
+                -6px -6px 12px var(--shadow-light);
+            transition: all 0.2s ease-in-out;
+        }
+
+        /* Reakce tlačítka na kliknutí/stisknutí (Pushed in) */
+        .neumorphic-button:active {
+            background-color: #4338ca;
+            /* Lehce tmavší indigo */
+            box-shadow: inset 4px 4px 8px var(--shadow-dark),
+                inset -4px -4px 8px var(--shadow-light);
         }
     </style>
 </head>
 
-<body class="bg-gray-100 flex items-center justify-center min-h-screen">
-    <div class="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-md">
-        <h2 class="text-2xl font-bold text-center text-gray-800">Přihlášení</h2>
-        <?php if ($error_message): ?>
-            <div class="p-4 rounded-md bg-red-100 text-red-700 text-sm">
-                <?php echo htmlspecialchars($error_message); ?>
+<body class="neumorphism-bg flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-5xl flex neumorphic-card rounded-3xl overflow-hidden">
+
+        <div class="hidden lg:flex lg:w-1/2 p-12 items-center justify-center bg-indigo-600 relative">
+
+            <div class="absolute inset-0 opacity-10 bg-gradient-to-br from-indigo-400 to-indigo-800"></div>
+
+            <div class="text-center z-10">
+                <i class="fas fa-cubes text-7xl text-white mb-6 transform rotate-12"></i>
+                <h2 class="text-4xl font-extralight text-white mb-3">Váš CMS - Chytré Řešení</h2>
+                <p class="text-indigo-200 text-lg">
+                    Přístup k modernímu systému pro správu klientů a provizí.
+                </p>
             </div>
-        <?php endif; ?>
-        <form action="login.php" method="post" class="space-y-4">
-            <div>
-                <label for="username" class="block text-sm font-medium text-gray-700">Uživatelské jméno (admin)</label>
-                <input type="text" id="username" name="username" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2">
-            </div>
-            <div>
-                <label for="password" class="block text-sm font-medium text-gray-700">Heslo (heslo123)</label>
-                <input type="password" id="password" name="password" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2">
-            </div>
-            <button type="submit" class="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200">
-                Přihlásit se
-            </button>
-        </form>
+        </div>
+
+        <div class="w-full lg:w-1/2 p-10 sm:p-12 space-y-8">
+
+            <h1 class="text-5xl font-extrabold text-center text-gray-800">
+                Můj <span class="text-indigo-600">CMS</span>
+            </h1>
+            <p class="text-center text-gray-500 text-sm">Zadejte své přihlašovací údaje</p>
+
+            <?php if ($error_message): ?>
+                <div class="p-3 rounded-xl bg-red-100 text-red-700 text-sm flex items-center space-x-2 border border-red-300">
+                    <i class="fas fa-exclamation-circle text-lg"></i>
+                    <span><?php echo htmlspecialchars($error_message); ?></span>
+                </div>
+            <?php endif; ?>
+
+            <form action="login.php" method="post" class="space-y-6">
+                <div>
+                    <label for="username" class="block text-sm font-semibold text-gray-600 flex items-center mb-2">
+                        <i class="fas fa-user-circle mr-2 text-indigo-600"></i> Uživatelské jméno (admin)
+                    </label>
+                    <input
+                        type="text"
+                        id="username"
+                        name="username"
+                        required
+                        class="neumorphic-input block w-full rounded-xl p-4 placeholder-gray-400 focus:ring-0"
+                        value="<?php echo htmlspecialchars($_POST['username'] ?? ''); ?>"
+                        placeholder="Zadejte uživatelské jméno">
+                </div>
+
+                <div>
+                    <label for="password" class="block text-sm font-semibold text-gray-600 flex items-center mb-2">
+                        <i class="fas fa-lock mr-2 text-indigo-600"></i> Heslo (heslo123)
+                    </label>
+                    <input
+                        type="password"
+                        id="password"
+                        name="password"
+                        required
+                        class="neumorphic-input block w-full rounded-xl p-4 placeholder-gray-400 focus:ring-0"
+                        placeholder="Zadejte heslo">
+                </div>
+
+                <button
+                    type="submit"
+                    class="w-full py-4 px-4 rounded-xl text-base font-bold neumorphic-button hover:opacity-95">
+                    <i class="fas fa-sign-in-alt mr-2"></i> Přihlásit se
+                </button>
+            </form>
+        </div>
+
     </div>
 </body>
 

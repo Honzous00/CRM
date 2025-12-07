@@ -4,7 +4,7 @@
 // Tyto hodnoty si upravte podle vašeho nastavení v XAMPP/MariaDB.
 define('DB_SERVER', 'localhost');
 define('DB_USERNAME', 'root'); // Výchozí uživatel v XAMPP
-define('DB_PASSWORD', '');     // Výchozí heslo v XAMPP
+define('DB_PASSWORD', 'Heslo123');     // Výchozí heslo v XAMPP
 define('DB_NAME', 'muj_cms');  // Název databáze, kterou vytvoříte
 
 // Vytvoření instance mysqli pro připojení
@@ -17,5 +17,3 @@ if ($conn->connect_error) {
 
 // Nastavení kódování znaků na UTF-8 pro správnou podporu češtiny
 $conn->set_charset("utf8mb4");
-
-?>

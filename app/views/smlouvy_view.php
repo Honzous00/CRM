@@ -7,7 +7,7 @@ function displaySmlouvyTable($smlouvy, $conn)
         return;
     }
 ?>
-    <div class="overflow-x-auto bg-gray-50 rounded-md border border-gray-200 shadow-sm">
+    <div class="overflow-x-auto bg-gray-50 rounded-md border border-gray-200 shadow-sm contracts-table-wrapper">
         <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-100">
                 <tr>
@@ -156,8 +156,7 @@ function displaySmlouvyTable($smlouvy, $conn)
                                     </button>
                                     <!-- dokud se tohle nesmaže, tak vracej -->
                                     <div id="documents-dropdown-<?php echo $row['id']; ?>"
-                                        class="hidden absolute left-0 mt-2 w-64 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 documents-dropdown"
-                                        style="position: absolute; z-index: 10001; background: white;">
+                                        class="hidden absolute left-0 mt-2 w-64 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 documents-dropdown">
                                         <div class="py-1 max-h-64 overflow-y-auto" role="menu" aria-orientation="vertical">
                                             <?php foreach ($vsechnyDokumenty as $index => $dokument): ?>
                                                 <a href="<?php echo htmlspecialchars($dokument['cesta']); ?>"

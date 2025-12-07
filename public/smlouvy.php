@@ -1,21 +1,4 @@
 <?php
-// Diagnostika PHP limitů
-error_reporting(E_ALL);
-ini_set('display_errors', 0);
-ini_set('log_errors', 1);
-
-// Zkontrolujeme error log
-$error_log = ini_get('error_log');
-echo "<!-- PHP error_log: $error_log -->";
-
-// Vytvoříme vlastní error log pokud neexistuje
-$custom_log = __DIR__ . '/../logs/upload_errors.log';
-if (!file_exists(dirname($custom_log))) {
-    mkdir(dirname($custom_log), 0755, true);
-}
-ini_set('error_log', $custom_log);
-echo "<!-- Custom error_log: $custom_log -->";
-
 // Vložení login logiky a kontrola přihlášení
 include_once __DIR__ . '/../app/includes/login.php';
 require_login();
@@ -24,35 +7,29 @@ require_login();
 include_once __DIR__ . '/../app/includes/header.php';
 include_once __DIR__ . '/../app/includes/db_connect.php';
 
-// PŘIDAT: Import CSS souboru pro dropdown dokumentů
+//Import CSS souboru pro dropdown dokumentů
 echo '<link rel="stylesheet" href="css/documents-dropdown.css">';
 
-// PŘIDAT: Důležité inline CSS pro opravu z-index
+//Inline styly pro opravu klipování tabulky a navigace
 echo '<style>
-    /* Resetovat všechny potenciální problémy s pozicováním */
-    .documents-dropdown {
-        position: fixed !important;
-        z-index: 10001 !important;
-        background: white;
-        border: 1px solid #e5e7eb;
-        border-radius: 0.375rem;
-        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-        max-height: 300px;
-        overflow-y: auto;
-    }
-    
-    /* Zajistit, aby dropdown zůstal nad vším */
-    body {
-        position: relative;
-    }
-    
-    /* Opravit pro tabulku - zajistit, že nebude blokovat */
+    /* 1. KÓD, KTERÝ ŘEŠÍ KLIPOVÁNÍ V TABULCE */
     .bg-white {
         position: static !important;
     }
-    
     .overflow-x-auto {
         position: static !important;
+    }
+
+    /* 2. KÓD, KTERÝ OPRAVUJE NAVIGACI ZPĚT */
+    header .absolute {
+        position: absolute !important;
+    }
+    header .relative {
+        position: relative !important;
+    }
+    header .bg-white {
+        position: absolute !important;
+        z-index: 50; 
     }
 </style>';
 
@@ -980,6 +957,54 @@ if (function_exists('displayEditModal')) {
         initializeEditButtons();
         initializeDeleteForms();
     });
+
+    let dokumentCounter = 1;
+
+    function addDokument() {
+        const container = document.getElementById('dokumenty-container');
+        const newRow = document.createElement('div');
+        newRow.className = 'dokument-row mb-4 p-4 border border-gray-200 rounded-lg bg-white';
+        newRow.innerHTML = `
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Typ dokumentu *</label>
+                <input type="text" name="dokument_typ[${dokumentCounter}]" list="typy-dokumentu" 
+                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2 dokument-typ"
+                       placeholder="Začněte psát pro návrhy..." required>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Soubor *</label>
+                <input type="file" name="dokument_soubor[${dokumentCounter}]" 
+                       class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                       accept=".pdf,.jpg,.jpeg,.png,.gif" required>
+                <p class="text-xs text-gray-500 mt-1">PDF, JPG, PNG, GIF (max. 10MB)</p>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Popis</label>
+                <input type="text" name="dokument_popis[${dokumentCounter}]" 
+                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2"
+                       placeholder="Volitelný popis...">
+                <button type="button" onclick="removeDokument(this)" class="mt-2 text-red-600 hover:text-red-800 text-sm">Odstranit</button>
+            </div>
+        </div>
+    `;
+        container.appendChild(newRow);
+        dokumentCounter++;
+    }
+
+    function removeDokument(button) {
+        const row = button.closest('.dokument-row');
+        if (document.querySelectorAll('.dokument-row').length > 1) {
+            row.remove();
+        } else {
+            row.querySelectorAll('input').forEach(input => {
+                if (input.type !== 'file') {
+                    input.value = '';
+                }
+            });
+            row.querySelector('input[type="file"]').value = '';
+        }
+    }
 </script>
 
 <?php

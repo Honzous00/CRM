@@ -67,6 +67,12 @@
                             <a href="../public/pojistovny.php" class="dropdown-item">
                                 <i class="fas fa-building mr-2"></i> Pojišťovny
                             </a>
+                            <!-- Správa uživatelů - pouze pro adminy -->
+                            <?php if (isset($_SESSION['is_admin']) && $_SESSION['is_admin'] == 1): ?>
+                                <a href="../public/users.php" class="dropdown-item">
+                                    <i class="fas fa-users mr-2"></i> Správa uživatelů
+                                </a>
+                            <?php endif; ?>
                         </div>
                     </li>
 
