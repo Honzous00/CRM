@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Vrstva_5" xmlns="http://www.w3.org/2000/svg" version="1.1" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 294.2 391.3">
+  <!-- Generator: Adobe Illustrator 29.8.2, SVG Export Plug-In . SVG Version: 2.1.1 Build 3)  -->
+  <defs>
+    <style>
+      .st0 {
+        letter-spacing: .2em;
+      }
+
+      .st0, .st1, .st2, .st3, .st4, .st5 {
+        isolation: isolate;
+      }
+
+      .st0, .st5 {
+        font-family: Montserrat-Light, Montserrat;
+        font-size: 36.5px;
+        font-weight: 300;
+      }
+
+      .st6 {
+        fill: url(#Nepojmenovaný_přechod_3);
+      }
+
+      .st7 {
+        fill: url(#Nepojmenovaný_přechod_4);
+      }
+
+      .st1 {
+        letter-spacing: .1em;
+      }
+
+      .st1, .st3, .st4 {
+        font-family: Montserrat-Bold, Montserrat;
+        font-size: 54.5px;
+        font-weight: 700;
+      }
+
+      .st8 {
+        fill: url(#Nepojmenovaný_přechod_2);
+      }
+
+      .st3 {
+        letter-spacing: .1em;
+      }
+
+      .st4 {
+        letter-spacing: .1em;
+      }
+
+      .st9 {
+        fill: url(#Nepojmenovaný_přechod);
+      }
+
+      .st5 {
+        letter-spacing: .1em;
+      }
+    </style>
+    <linearGradient id="Nepojmenovaný_přechod" data-name="Nepojmenovaný přechod" x1="117.4" y1="119.7" x2="117.4" y2="369.8" gradientTransform="translate(0 409.9) scale(1 -1)" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1d4ed8"/>
+      <stop offset="1" stop-color="#60a5fa"/>
+    </linearGradient>
+    <linearGradient id="Nepojmenovaný_přechod_2" data-name="Nepojmenovaný přechod 2" x1="91.3" y1="119.7" x2="91.3" y2="369.8" gradientTransform="translate(0 409.9) scale(1 -1)" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1d4ed8"/>
+      <stop offset="1" stop-color="#60a5fa"/>
+    </linearGradient>
+    <linearGradient id="Nepojmenovaný_přechod_3" data-name="Nepojmenovaný přechod 3" x1="177.7" y1="155.9" x2="177.7" y2="405.9" gradientTransform="translate(0 409.9) scale(1 -1)" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f05833"/>
+      <stop offset="1" stop-color="#f7a02d"/>
+    </linearGradient>
+    <linearGradient id="Nepojmenovaný_přechod_4" data-name="Nepojmenovaný přechod 4" x1="203.8" y1="155.9" x2="203.8" y2="405.9" gradientTransform="translate(0 409.9) scale(1 -1)" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f05833"/>
+      <stop offset="1" stop-color="#f7a02d"/>
+    </linearGradient>
+  </defs>
+  <g>
+    <g>
+      <path class="st9" d="M230.3,263.8c-23.4,16.6-51.9,26.4-82.8,26.4-57.5,0-107-33.9-129.8-82.8-1.8-3.9-3.5-7.9-4.9-12-5.4-15.1-8.4-31.3-8.4-48.3s.4-12,1.1-17.8c2.7-21.4,10-41.3,21-58.7,7.2-11.3,15.9-21.6,25.9-30.5-5.3,7-9.5,15.4-12.1,24.7h0c-1.4,5-2.3,10.2-2.7,15.6-2.7,36.1,18.6,67.1,47.6,69.3,13.6,1,26.5-4.5,36.7-14.4,3.1,4.5,7.9,10.5,11.3,15.3,2.3,3.3,1.2,8-4.1,8h-2.6c-1.2,0-2.6,4.5-2.1,5.6l1.3,2.8c.5,1.1.2,2.6-.7,3.5l-3.1,3s1.6,1.6,1.6,3.9-5.6,1-3,6.9c1.5,3.4,3,8.7.4,12.2-6,8.2-10.1,2.2-22.2,4.3-8.9,1.6-10.1,7.9-11,11.9-2.4,10.9,8,21.6,13.6,27.6,0,0,44.1,53.3,129,23.7h0Z"/>
+      <circle class="st8" cx="91.3" cy="109.8" r="26.3"/>
+    </g>
+    <g>
+      <path class="st6" d="M64.8,30.4C88.2,13.8,116.7,4,147.6,4c57.5,0,107,33.9,129.8,82.8,1.8,3.9,3.5,7.9,4.9,12,5.4,15.1,8.4,31.3,8.4,48.3s-.4,12-1.1,17.8c-2.6,21.4-10,41.3-21,58.7-7.2,11.3-15.9,21.6-25.9,30.5,5.3-7,9.5-15.4,12.1-24.7h0c1.4-5,2.3-10.2,2.7-15.6,2.7-36.1-18.6-67.1-47.6-69.3-13.6-1-26.5,4.5-36.7,14.4-3.1-4.5-7.9-10.5-11.3-15.3-2.3-3.3-1.2-8,4.1-8h2.6c1.2,0,2.6-4.5,2.1-5.6l-1.3-2.8c-.5-1.1-.2-2.6.7-3.5l3.1-3s-1.6-1.6-1.6-3.9,5.6-1,3-6.9c-1.5-3.3-3-8.7-.4-12.2,6-8.2,10.1-2.2,22.2-4.3,8.9-1.6,10.1-7.9,11-11.9,2.4-10.9-8-21.6-13.6-27.6,0,0-44.1-53.3-129-23.7h0Z"/>
+      <circle class="st7" cx="203.8" cy="184.4" r="26.3"/>
+    </g>
+  </g>
+  <g class="st2">
+    <text class="st1" transform="translate(.5 349.3)"><tspan x="0" y="0">RE</tspan></text>
+    <text class="st4" transform="translate(92 349.3)"><tspan x="0" y="0">L</tspan></text>
+    <text class="st3" transform="translate(132.6 349.3)"><tspan x="0" y="0">A</tspan></text>
+    <text class="st1" transform="translate(179.9 349.3)"><tspan x="0" y="0">TIO</tspan></text>
+    <text class="st0" transform="translate(3 387.3)"><tspan x="0" y="0">CRM </tspan></text>
+    <text class="st5" transform="translate(121.4 387.3)"><tspan x="0" y="0">SY</tspan></text>
+    <text class="st5" transform="translate(176.3 387.3)"><tspan x="0" y="0">S</tspan></text>
+    <text class="st0" transform="translate(203.7 387.3)"><tspan x="0" y="0">TEM</tspan></text>
+  </g>
+</svg>

@@ -4,7 +4,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Můj Klientský Systém</title>
+    <title>Relatio | CRM Systém</title>
+
+    <!-- Favicon od RealFaviconGenerator -->
+    <link rel="apple-touch-icon" sizes="180x180" href="images/favicon/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="images/favicon/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="images/favicon/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
 
     <!-- Pro rychlejší načítání CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -18,7 +24,10 @@
 <body class="bg-gray-100 min-h-screen flex flex-col">
     <header class="bg-blue-600 text-white p-4 shadow-xl">
         <div class="container mx-auto flex justify-between items-center">
-            <a href="../public/index.php" class="text-3xl font-extrabold">Můj <span class="text-blue-200">CMS</span></a>
+            <a href="../public/index.php">
+                <img src="images/logo/White_simple.svg" alt="RELATIO CMS Systém"
+                    class="h-8 sm:h-8 md:h-8 lg:h-8 w-auto">
+            </a>
             <nav>
                 <ul class="flex space-x-2 items-center">
 

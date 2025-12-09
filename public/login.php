@@ -37,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         /* Definice barev pro snadné úpravy */
         :root {
             --soft-bg: #f0f2f5;
-            --accent-color: #4f46e5;
+            --accent-color: #2963e5;
             /* Indigo-600 */
             --shadow-light: #ffffff;
             --shadow-dark: #c8cacd;
@@ -84,7 +84,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         /* Reakce tlačítka na kliknutí/stisknutí (Pushed in) */
         .neumorphic-button:active {
-            background-color: #4338ca;
+            background-color: #2963e5;
             /* Lehce tmavší indigo */
             box-shadow: inset 4px 4px 8px var(--shadow-dark),
                 inset -4px -4px 8px var(--shadow-light);
@@ -96,25 +96,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <div class="w-full max-w-5xl flex neumorphic-card rounded-3xl overflow-hidden">
 
-        <div class="hidden lg:flex lg:w-1/2 p-12 items-center justify-center bg-indigo-600 relative">
+        <div class="hidden lg:flex lg:w-1/2 p-12 items-center justify-center bg-blue-600 relative">
 
-            <div class="absolute inset-0 opacity-10 bg-gradient-to-br from-indigo-400 to-indigo-800"></div>
+            <div class="absolute inset-0 opacity-10 bg-gradient-to-br from-blue-400 to-blue-800"></div>
 
             <div class="text-center z-10">
-                <i class="fas fa-cubes text-7xl text-white mb-6 transform rotate-12"></i>
-                <h2 class="text-4xl font-extralight text-white mb-3">Váš CMS - Chytré Řešení</h2>
-                <p class="text-indigo-200 text-lg">
+                <img src="images/logo/White_square.svg" alt="RELATIO CRM SYSTEM Logo" class="w-64 h-64 mx-auto mb-6" />
+
+                <p class="text-white text-lg font-normal">
                     Přístup k modernímu systému pro správu klientů a provizí.
                 </p>
             </div>
         </div>
 
-        <div class="w-full lg:w-1/2 p-10 sm:p-12 space-y-8">
+        <div class="w-full lg:w-1/2 p-10 sm:p-12">
 
-            <h1 class="text-5xl font-extrabold text-center text-gray-800">
-                Můj <span class="text-indigo-600">CMS</span>
+            <h1 class="text-4xl font-extrabold text-center text-gray-800 mb-3">
+                Přihlášení <span class="text-blue-600">uživatele</span>
             </h1>
-            <p class="text-center text-gray-500 text-sm">Zadejte své přihlašovací údaje</p>
+            <p class="text-center text-gray-700 text-lm mb-8">Zadejte své přihlašovací údaje</p>
 
             <?php if ($error_message): ?>
                 <div class="p-3 rounded-xl bg-red-100 text-red-700 text-sm flex items-center space-x-2 border border-red-300">
@@ -126,7 +126,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <form action="login.php" method="post" class="space-y-6">
                 <div>
                     <label for="username" class="block text-sm font-semibold text-gray-600 flex items-center mb-2">
-                        <i class="fas fa-user-circle mr-2 text-indigo-600"></i> Uživatelské jméno (admin)
+                        <i class="fas fa-user-circle mr-2 text-blue-600"></i> Uživatelské jméno (admin)
                     </label>
                     <input
                         type="text"
@@ -140,7 +140,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 <div>
                     <label for="password" class="block text-sm font-semibold text-gray-600 flex items-center mb-2">
-                        <i class="fas fa-lock mr-2 text-indigo-600"></i> Heslo (Heslo123!)
+                        <i class="fas fa-lock mr-2 text-blue-600"></i> Heslo (Heslo123!)
                     </label>
                     <input
                         type="password"
@@ -153,7 +153,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 <button
                     type="submit"
-                    class="w-full py-4 px-4 rounded-xl text-base font-bold neumorphic-button hover:opacity-95">
+                    class="w-full py-4 px-4 rounded-xl text-base font-bold neumorphic-button hover:opacity-95 ">
                     <i class="fas fa-sign-in-alt mr-2"></i> Přihlásit se
                 </button>
             </form>
