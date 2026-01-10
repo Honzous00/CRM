@@ -126,7 +126,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <form action="login.php" method="post" class="space-y-6">
                 <div>
                     <label for="username" class="block text-sm font-semibold text-gray-600 flex items-center mb-2">
-                        <i class="fas fa-user-circle mr-2 text-blue-600"></i> Uživatelské jméno (admin)
+                        <i class="fas fa-user-circle mr-2 text-blue-600"></i> Uživatelské jméno
                     </label>
                     <input
                         type="text"
@@ -140,7 +140,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 <div>
                     <label for="password" class="block text-sm font-semibold text-gray-600 flex items-center mb-2">
-                        <i class="fas fa-lock mr-2 text-blue-600"></i> Heslo (Heslo123!)
+                        <i class="fas fa-lock mr-2 text-blue-600"></i> Heslo
                     </label>
                     <input
                         type="password"
