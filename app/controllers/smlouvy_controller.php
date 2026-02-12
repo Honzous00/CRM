@@ -1,5 +1,7 @@
 <?php
 include_once __DIR__ . '/../includes/db_connect.php';
+include_once __DIR__ . '/../models/smlouvy_model.php';   // nový model
+include_once __DIR__ . '/../models/provize_model.php';   // nový model
 
 class SmlouvyController
 {
@@ -7,16 +9,25 @@ class SmlouvyController
     private $message = '';
     private $message_type = '';
 
+    // --- nové property pro detail ---
+    private $smlouvaDetail = null;
+    private $provizeList = [];
+    private $totalProvize = 0;
+
     public function __construct($conn)
     {
         $this->conn = $conn;
     }
 
+    /**
+     * Hlavní handler – nyní zpracovává jak POST (akce), tak GET (detail).
+     */
     public function handleRequest()
     {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $this->handlePost();
         }
+        // Žádné GET zpracování – detail řeší samostatný skript
     }
 
     private function handlePost()
@@ -140,8 +151,8 @@ class SmlouvyController
             };
 
             $this->setMessage("Smlouva byla úspěšně přidána.", "success");
-            //header("Location: smlouvy.php");
-            //exit;
+            header("Location: smlouvy.php");
+            exit;
         }
         $stmt_insert->close();
     }
@@ -174,6 +185,23 @@ class SmlouvyController
         }
 
         return $errors;
+    }
+
+    /**
+     * Načte detail smlouvy a seznam provizí do interních proměnných.
+     *
+     * @param int $id
+     */
+    private function loadSmlouvaDetail($id)
+    {
+        $smlouvyModel = new SmlouvyModel($this->conn);
+        $this->smlouvaDetail = $smlouvyModel->getSmlouvaById($id);
+
+        if ($this->smlouvaDetail) {
+            $provizeModel = new ProvizeModel($this->conn);
+            $this->provizeList = $provizeModel->getProvizeBySmlouva($id);
+            $this->totalProvize = $provizeModel->getTotalProvizeBySmlouva($id);
+        }
     }
 
     private function processFileUpload($file)
@@ -411,6 +439,26 @@ class SmlouvyController
     {
         $this->message = $message;
         $this->message_type = $type;
+    }
+
+    public function hasSmlouvaDetail()
+    {
+        return $this->smlouvaDetail !== null;
+    }
+
+    public function getSmlouvaDetail()
+    {
+        return $this->smlouvaDetail;
+    }
+
+    public function getProvizeList()
+    {
+        return $this->provizeList;
+    }
+
+    public function getTotalProvize()
+    {
+        return $this->totalProvize;
     }
 
     private function processDocuments($smlouva_id, $post_data, $files_data, $hlavni_smlouva_jiz_zpracovana = false)

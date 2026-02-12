@@ -27,7 +27,8 @@ function displaySmlouvyTable($smlouvy, $conn)
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
                 <?php foreach ($smlouvy as $row): ?>
-                    <tr class="hover:bg-gray-100 transition-colors"
+                    <tr class="hover:bg-gray-100 transition-colors smlouva-row"
+                        data-smlouva-id="<?php echo $row['id']; ?>"
                         data-id="<?php echo htmlspecialchars($row['id']); ?>"
                         data-klient-id="<?php echo htmlspecialchars($row['klient_id']); ?>"
                         data-cislo-smlouvy="<?php echo htmlspecialchars($row['cislo_smlouvy']); ?>"
@@ -40,7 +41,11 @@ function displaySmlouvyTable($smlouvy, $conn)
                         data-cesta-k-souboru="<?php echo htmlspecialchars($row['cesta_k_souboru']); ?>"
                         data-podminky-produktu="<?php echo htmlspecialchars($row['podminky_produktu']); ?>">
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($row['jmeno_klienta']); ?></td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($row['cislo_smlouvy']); ?></td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            <a href="smlouvy.php?id=<?php echo $row['id']; ?>" class="text-blue-600 hover:text-blue-800 hover:underline">
+                                <?php echo htmlspecialchars($row['cislo_smlouvy']); ?>
+                            </a>
+                        </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($row['nazev_produktu']); ?></td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($row['nazev_pojistovny']); ?></td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($row['datum_sjednani']); ?></td>
@@ -207,6 +212,218 @@ function displaySmlouvyTable($smlouvy, $conn)
         </table>
     </div>
 
+<?php
+}
+?>
+
+<?php
+/**
+ * Zobrazení detailní karty smlouvy a seznamu provizí.
+ *
+ * @param array $smlouva
+ * @param array $provize
+ * @param float $totalProvize
+ * @param mysqli $conn Připojení k databázi (nutné pro DokumentyModel)
+ */
+function displaySmlouvaDetail($smlouva, $provize, $totalProvize, $conn)
+{
+?>
+    <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
+        <!-- HLAVIČKA S TLAČÍTKY AKCÍ -->
+        <div class="flex flex-wrap justify-between items-center mb-6 pb-4 border-b border-gray-200 gap-2">
+            <h2 class="text-2xl font-bold text-gray-800">Detail smlouvy</h2>
+            <div class="flex items-center gap-2">
+                <!-- TLAČÍTKO UPRAVIT -->
+                <button type="button"
+                    onclick='openEditModalFromDetail(<?php echo json_encode($smlouva, JSON_HEX_APOS | JSON_HEX_QUOT); ?>)'
+                    class="inline-flex items-center px-3 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 transition-colors">
+                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                    Upravit
+                </button>
+
+                <!-- TLAČÍTKO SMAZAT (formulář) -->
+                <form method="post" action="smlouvy.php"
+                    onsubmit="return confirm('Opravdu chcete smazat smlouvu č. <?php echo htmlspecialchars($smlouva['cislo_smlouvy']); ?>?');"
+                    class="inline-block m-0 p-0">
+                    <input type="hidden" name="delete_id" value="<?php echo $smlouva['id']; ?>">
+                    <button type="submit"
+                        class="inline-flex items-center px-3 py-2 bg-red-600 text-white text-sm font-medium rounded-md hover:bg-red-700 transition-colors">
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        Smazat
+                    </button>
+                </form>
+
+                <!-- ZPĚT NA SEZNAM (původní) -->
+                <a href="smlouvy.php"
+                    class="inline-flex items-center px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                    </svg>
+                    Zpět na seznam
+                </a>
+            </div>
+        </div>
+
+        <!-- Dvousloupcový grid s informacemi o smlouvě -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Levý sloupec -->
+            <div class="space-y-4">
+                <div class="flex items-start">
+                    <span class="text-sm font-medium text-gray-500 w-32">Číslo smlouvy:</span>
+                    <span class="text-sm text-gray-900 font-semibold"><?php echo htmlspecialchars($smlouva['cislo_smlouvy']); ?></span>
+                </div>
+                <div class="flex items-start">
+                    <span class="text-sm font-medium text-gray-500 w-32">Klient:</span>
+                    <span class="text-sm text-gray-900"><?php echo htmlspecialchars($smlouva['jmeno_klienta']); ?></span>
+                </div>
+                <div class="flex items-start">
+                    <span class="text-sm font-medium text-gray-500 w-32">Produkt:</span>
+                    <span class="text-sm text-gray-900"><?php echo htmlspecialchars($smlouva['nazev_produktu']); ?></span>
+                </div>
+                <div class="flex items-start">
+                    <span class="text-sm font-medium text-gray-500 w-32">Pojišťovna:</span>
+                    <span class="text-sm text-gray-900"><?php echo htmlspecialchars($smlouva['nazev_pojistovny']); ?></span>
+                </div>
+            </div>
+
+            <!-- Pravý sloupec -->
+            <div class="space-y-4">
+                <div class="flex items-start">
+                    <span class="text-sm font-medium text-gray-500 w-32">Datum sjednání:</span>
+                    <span class="text-sm text-gray-900"><?php echo date('d.m.Y', strtotime($smlouva['datum_sjednani'])); ?></span>
+                </div>
+                <div class="flex items-start">
+                    <span class="text-sm font-medium text-gray-500 w-32">Datum platnosti:</span>
+                    <span class="text-sm text-gray-900"><?php echo date('d.m.Y', strtotime($smlouva['datum_platnosti'])); ?></span>
+                </div>
+                <div class="flex items-start">
+                    <span class="text-sm font-medium text-gray-500 w-32">Záznam Zeteo:</span>
+                    <span class="text-sm text-gray-900">
+                        <?php echo $smlouva['zaznam_zeteo'] ? 'Ano' : 'Ne'; ?>
+                    </span>
+                </div>
+                <div class="flex items-start">
+                    <span class="text-sm font-medium text-gray-500 w-32">Poznámka:</span>
+                    <span class="text-sm text-gray-900"><?php echo htmlspecialchars($smlouva['poznamka'] ?: '-'); ?></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Specifické podmínky produktu (pokud existují) -->
+        <?php if (!empty($smlouva['podminky_produktu'])): ?>
+            <div class="mt-6 pt-4 border-t border-gray-200">
+                <h3 class="text-lg font-semibold text-gray-800 mb-3">Specifika produktu</h3>
+                <div class="bg-gray-50 p-4 rounded-lg">
+                    <dl class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
+                        <?php foreach ($smlouva['podminky_produktu'] as $klic => $hodnota): ?>
+                            <?php if (!empty($hodnota) && $hodnota !== 'Ne'): ?>
+                                <div class="flex justify-between py-1">
+                                    <dt class="text-sm font-medium text-gray-600"><?php echo htmlspecialchars(ucfirst(str_replace('_', ' ', $klic))); ?>:</dt>
+                                    <dd class="text-sm text-gray-900"><?php echo htmlspecialchars($hodnota); ?></dd>
+                                </div>
+                            <?php endif; ?>
+                        <?php endforeach; ?>
+                    </dl>
+                </div>
+            </div>
+        <?php endif; ?>
+
+        <!-- Dokumenty (opraveno – použito $conn) -->
+        <?php
+        $dokumentyModel = new DokumentyModel($conn);
+        $dokumenty = $dokumentyModel->getDokumentyBySmlouva($smlouva['id']);
+        $hlavniDokument = !empty($smlouva['cesta_k_souboru']);
+        ?>
+        <?php if ($hlavniDokument || !empty($dokumenty)): ?>
+            <div class="mt-6 pt-4 border-t border-gray-200">
+                <h3 class="text-lg font-semibold text-gray-800 mb-3">Dokumenty</h3>
+                <div class="flex flex-wrap gap-2">
+                    <?php if ($hlavniDokument): ?>
+                        <a href="<?php echo htmlspecialchars($smlouva['cesta_k_souboru']); ?>" target="_blank"
+                            class="inline-flex items-center px-3 py-2 bg-blue-50 text-blue-700 rounded-md hover:bg-blue-100 transition-colors">
+                            <!-- SVG ikona -->
+                            Hlavní smlouva
+                        </a>
+                    <?php endif; ?>
+                    <?php foreach ($dokumenty as $dok): ?>
+                        <?php if ($dok['typ_dokumentu'] !== 'Smlouva' && !empty($dok['cesta_k_souboru'])): ?>
+                            <a href="<?php echo htmlspecialchars($dok['cesta_k_souboru']); ?>" target="_blank"
+                                class="inline-flex items-center px-3 py-2 bg-gray-50 text-gray-700 rounded-md hover:bg-gray-100 transition-colors">
+                                <!-- SVG ikona -->
+                                <?php echo htmlspecialchars($dok['typ_dokumentu']); ?>
+                            </a>
+                        <?php endif; ?>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+        <?php endif; ?>
+    </div>
+
+    <!-- Sekce provizí -->
+    <div class="bg-white rounded-lg shadow-lg p-6">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-xl font-bold text-gray-800">Provize ke smlouvě</h3>
+            <div class="text-lg">
+                <span class="font-medium text-gray-600">Celkem:</span>
+                <span class="font-bold text-green-600 ml-2"><?php echo number_format($totalProvize, 2, ',', ' '); ?> Kč</span>
+            </div>
+        </div>
+
+        <?php if (empty($provize)): ?>
+            <p class="text-gray-500 py-4 text-center">K této smlouvě nejsou evidovány žádné provize.</p>
+        <?php else: ?>
+            <div class="overflow-x-auto border border-gray-200 rounded-lg">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-100">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Datum</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Částka</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stav</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Poznámka</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vytvořeno</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        <?php foreach ($provize as $provizeItem): ?>
+                            <tr class="hover:bg-gray-50 transition-colors">
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    <?php echo date('d.m.Y', strtotime($provizeItem['datum_provize'] ?? $provizeItem['datum_vytvoreni'])); ?>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                    <?php echo number_format($provizeItem['castka'], 2, ',', ' '); ?> Kč
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                    <?php
+                                    $stav = $provizeItem['stav'] ?? 'čeká';
+                                    $badgeColor = match ($stav) {
+                                        'zaplaceno' => 'bg-green-100 text-green-800',
+                                        'stornováno' => 'bg-red-100 text-red-800',
+                                        default => 'bg-yellow-100 text-yellow-800',
+                                    };
+                                    ?>
+                                    <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full <?php echo $badgeColor; ?>">
+                                        <?php echo htmlspecialchars(ucfirst($stav)); ?>
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <?php echo htmlspecialchars($provizeItem['poznamka'] ?: '-'); ?>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <?php echo date('d.m.Y', strtotime($provizeItem['datum_vytvoreni'])); ?>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        <?php endif; ?>
+    </div>
 <?php
 }
 ?>

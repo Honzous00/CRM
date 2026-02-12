@@ -9,3 +9,5 @@ uploads/
 debug_upload.php
 logs/
 installed.lock
+fix.php
+login

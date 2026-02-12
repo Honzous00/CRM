@@ -171,30 +171,48 @@ if ($result_smlouvy->num_rows > 0) {
 }
 
 // Získání seznamu všech provizí s informacemi o smlouvě
-$sql_provize = "
+$sql = "
     SELECT
-        provize.id,
-        provize.smlouva_id,
-        provize.datum_vyplaty,
-        provize.castka,
-        provize.stornovana,
-        provize.storno_rezerva,
-        provize.predavaci_dokument_cislo,
-        provize.cislo_vypisu,
-        provize.stupen_vyplaceni,
-        provize.datum_vytvoreni,
-        smlouvy.cislo_smlouvy,
-        predavaci_dokumenty.cislo AS predavaci_dokument,
-        predavaci_dokumenty.id AS predavaci_dokument_id,
-        klienti.jmeno AS jmeno_klienta
-    FROM provize
-    LEFT JOIN smlouvy ON provize.smlouva_id = smlouvy.id
-    LEFT JOIN klienti ON smlouvy.klient_id = klienti.id
-    LEFT JOIN predavaci_dokumenty ON smlouvy.predavaci_dokument_id = predavaci_dokumenty.id
-    ORDER BY provize.datum_vytvoreni DESC
+        p.id,
+        p.smlouva_id,
+        p.datum_vyplaty,
+        p.castka,
+        p.stornovana,
+        p.storno_rezerva,
+        p.predavaci_dokument_cislo,
+        p.cislo_vypisu,
+        p.stupen_vyplaceni,
+        p.datum_vytvoreni,
+        s.cislo_smlouvy,
+        s.predavaci_dokument_id,
+        k.jmeno AS jmeno_klienta,
+        pd.cislo AS predavaci_dokument
+    FROM provize p
+    LEFT JOIN smlouvy s ON p.smlouva_id = s.id
+    LEFT JOIN klienti k ON s.klient_id = k.id
+    LEFT JOIN predavaci_dokumenty pd ON s.predavaci_dokument_id = pd.id
+    ORDER BY p.smlouva_id, p.datum_vytvoreni DESC
 ";
-$result_provize = $conn->query($sql_provize);
-$count_results = $result_provize->num_rows;
+$result = $conn->query($sql);
+// Seskupení podle smlouva_id
+$contracts = [];
+while ($row = $result->fetch_assoc()) {
+    $smlouva_id = $row['smlouva_id'];
+    if (!isset($contracts[$smlouva_id])) {
+        $contracts[$smlouva_id] = [
+            'smlouva_id' => $smlouva_id,
+            'cislo_smlouvy' => $row['cislo_smlouvy'],
+            'jmeno_klienta' => $row['jmeno_klienta'],
+            'commissions' => [],
+            'total' => 0,
+            'count' => 0
+        ];
+    }
+    $contracts[$smlouva_id]['commissions'][] = $row;
+    $contracts[$smlouva_id]['total'] += $row['castka'];
+    $contracts[$smlouva_id]['count']++;
+}
+$count_results = count($contracts);
 ?>
 
 <div class="container mx-auto mt-8 p-6 bg-white rounded-lg shadow-lg">
@@ -244,86 +262,42 @@ $count_results = $result_provize->num_rows;
     <div class="mt-8">
         <h2 class="text-xl font-semibold mb-4">Seznam provizí</h2>
         <div id="commissions-table-container">
-            <?php if ($result_provize->num_rows > 0): ?>
+            <?php if (!empty($contracts)): ?>
                 <div class="overflow-x-auto bg-gray-50 rounded-md border border-gray-200 shadow-sm">
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-100">
                             <tr>
-                                <!-- <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th> -->
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Klient</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Číslo smlouvy</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Datum výplaty</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Částka</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stornována</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stornorezerva</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Předávací dokument</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Číslo výpisu</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stupeň vyplácení</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vytvořeno</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Akce</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Počet provizí</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Celková částka</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" colspan="7"> </th>
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
-                            <?php while ($row = $result_provize->fetch_assoc()): ?>
-                                <tr class="hover:bg-gray-100 transition-colors">
-                                    <!-- <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($row['id']); ?></td> -->
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($row['jmeno_klienta']); ?></td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($row['cislo_smlouvy']); ?></td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($row['datum_vyplaty']); ?></td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($row['castka']); ?></td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-center">
-                                        <?php echo $row['stornovana'] ? '&#x2714;' : '&#x2718;'; ?>
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($row['storno_rezerva']); ?></td>
+                            <?php foreach ($contracts as $contract): ?>
+                                <tr class="hover:bg-blue-50 transition-colors duration-150 cursor-pointer contract-row"
+                                    data-smlouva-id="<?php echo $contract['smlouva_id']; ?>">
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                        <?php if (!empty($row['predavaci_dokument'])): ?>
-                                            <a href="predavaci_dokumenty.php?id=<?php echo $row['predavaci_dokument_id']; ?>"
-                                                class="text-blue-600 hover:text-blue-800 transition-colors duration-200">
-                                                <?php echo htmlspecialchars($row['predavaci_dokument_cislo']); ?>
-                                            </a>
-                                        <?php else: ?>
-                                            <?php echo htmlspecialchars($row['predavaci_dokument_cislo']); ?>
-                                        <?php endif; ?>
+                                        <?php echo htmlspecialchars($contract['jmeno_klienta']); ?>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                        <?php if (!empty($row['cislo_vypisu'])): ?>
-                                            <a href="cislo_vypisu.php?cislo=<?php echo urlencode($row['cislo_vypisu']); ?>"
-                                                class="text-green-600 hover:text-green-800 transition-colors duration-200">
-                                                <?php echo htmlspecialchars($row['cislo_vypisu']); ?>
-                                            </a>
-                                        <?php else: ?>
-                                            <?php echo htmlspecialchars($row['cislo_vypisu']); ?>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($row['stupen_vyplaceni']); ?></td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><?php echo date('d.m.Y', strtotime($row['datum_vytvoreni'])); ?></td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                        <button class="text-indigo-600 hover:text-indigo-900 edit-btn mr-3"
-                                            data-id="<?php echo $row['id']; ?>"
-                                            data-smlouva-id="<?php echo $row['smlouva_id']; ?>"
-                                            data-datum-vyplaty="<?php echo $row['datum_vyplaty']; ?>"
-                                            data-castka="<?php echo $row['castka']; ?>"
-                                            data-stornovana="<?php echo $row['stornovana']; ?>"
-                                            data-storno-rezerva="<?php echo $row['storno_rezerva']; ?>"
-                                            data-predavaci-dokument-cislo="<?php echo $row['predavaci_dokument_cislo']; ?>"
-                                            data-cislo-vypisu="<?php echo $row['cislo_vypisu']; ?>"
-                                            data-stupen-vyplaceni="<?php echo $row['stupen_vyplaceni']; ?>">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block mr-1" viewBox="0 0 20 20" fill="currentColor">
-                                                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                                            </svg>
-                                            Upravit
-                                        </button>
-                                        <a href="?action=delete&id=<?php echo $row['id']; ?>"
-                                            class="text-red-600 hover:text-red-900 delete-btn"
-                                            data-confirm="Opravdu chcete smazat tuto provizi?">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block mr-1" viewBox="0 0 20 20" fill="currentColor">
-                                                <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
-                                            </svg>
-                                            Smazat
+                                        <a href="smlouvy.php?search=<?php echo urlencode($contract['cislo_smlouvy']); ?>"
+                                            class="text-blue-600 hover:underline">
+                                            <?php echo htmlspecialchars($contract['cislo_smlouvy']); ?>
                                         </a>
                                     </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                        <?php echo $contract['count']; ?>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                        <?php echo number_format($contract['total'], 2, ',', ' '); ?> Kč
+                                    </td>
+                                    <td colspan="7" class="px-6 py-4 text-sm text-gray-400 italic">
+                                        Kliknutím na řádek zobrazíte detail provizí
+                                    </td>
                                 </tr>
-                            <?php endwhile; ?>
+                            <?php endforeach; ?>
                         </tbody>
                     </table>
                 </div>
@@ -449,8 +423,56 @@ $count_results = $result_provize->num_rows;
     </div>
 </div>
 
+<!-- MODÁLNÍ OKNO PRO SEZNAM PROVIZÍ DANÉ SMLOUVY -->
+<div id="contractCommissionsModal" class="fixed z-30 inset-0 overflow-y-auto hidden">
+    <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div class="fixed inset-0 transition-opacity" aria-hidden="true">
+            <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+        </div>
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
+        <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-6xl sm:w-full">
+            <div class="flex justify-between items-center p-6 border-b border-gray-200">
+                <h2 class="text-2xl font-semibold text-gray-800">Provize ke smlouvě</h2>
+                <button type="button" onclick="closeContractCommissionsModal()" class="text-gray-500 hover:text-gray-700">
+                    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <div class="bg-white px-6 py-4">
+                <div id="contract-commissions-content">
+                    <!-- Sem se AJAXem načte tabulka provizí -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
 <script>
+    // Otevření modálního okna se seznamem provizí pro smlouvu
+    function openContractCommissionsModal(smlouvaId) {
+        document.getElementById('contract-commissions-content').innerHTML = '<div class="text-center py-4">Načítání provizí...</div>';
+        document.getElementById('contractCommissionsModal').classList.remove('hidden');
+
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', 'get_commissions_by_contract.php?smlouva_id=' + encodeURIComponent(smlouvaId), true);
+        xhr.onload = function() {
+            if (xhr.status === 200) {
+                document.getElementById('contract-commissions-content').innerHTML = xhr.responseText;
+            } else {
+                document.getElementById('contract-commissions-content').innerHTML = '<div class="text-center py-4 text-red-500">Chyba při načítání provizí.</div>';
+            }
+        };
+        xhr.onerror = function() {
+            document.getElementById('contract-commissions-content').innerHTML = '<div class="text-center py-4 text-red-500">Chyba připojení k serveru.</div>';
+        };
+        xhr.send();
+    }
+
+    function closeContractCommissionsModal() {
+        document.getElementById('contractCommissionsModal').classList.add('hidden');
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
         const modal = document.getElementById('modal');
         const openModalBtn = document.getElementById('openModal');
@@ -467,34 +489,39 @@ $count_results = $result_provize->num_rows;
         let searchTimeout;
 
         // Event delegation pro editaci a mazání (funguje i pro dynamicky načtený obsah)
-        document.getElementById('commissions-table-container').addEventListener('click', function(e) {
-            // Editace
-            if (e.target.closest('.edit-btn')) {
-                const button = e.target.closest('.edit-btn');
+        document.addEventListener('click', function(e) {
+            // ---- EDITACE ----
+            const editBtn = e.target.closest('.edit-btn');
+            if (editBtn) {
+                e.preventDefault(); // zabrání případnému odeslání formuláře
+
+                // Nastav nadpis a akci
                 modalTitle.textContent = 'Upravit provizi';
                 formAction.value = 'update';
 
                 // Naplnění formuláře daty
-                provizeIdInput.value = button.getAttribute('data-id');
-                smlouvaSelect.value = button.getAttribute('data-smlouva-id');
-                document.getElementById('datum_vyplaty').value = button.getAttribute('data-datum-vyplaty');
-                document.getElementById('castka').value = button.getAttribute('data-castka');
-                document.getElementById('stornovana').checked = button.getAttribute('data-stornovana') === '1';
-                document.getElementById('storno_rezerva').value = button.getAttribute('data-storno-rezerva');
-                document.getElementById('predavaci_dokument_cislo').value = button.getAttribute('data-predavaci-dokument-cislo');
-                document.getElementById('cislo_vypisu').value = button.getAttribute('data-cislo-vypisu');
-                document.getElementById('stupen_vyplaceni').value = button.getAttribute('data-stupen-vyplaceni');
+                provizeIdInput.value = editBtn.getAttribute('data-id');
+                smlouvaSelect.value = editBtn.getAttribute('data-smlouva-id');
+                document.getElementById('datum_vyplaty').value = editBtn.getAttribute('data-datum-vyplaty');
+                document.getElementById('castka').value = editBtn.getAttribute('data-castka');
+                document.getElementById('stornovana').checked = editBtn.getAttribute('data-stornovana') === '1';
+                document.getElementById('storno_rezerva').value = editBtn.getAttribute('data-storno-rezerva');
+                document.getElementById('predavaci_dokument_cislo').value = editBtn.getAttribute('data-predavaci-dokument-cislo');
+                document.getElementById('cislo_vypisu').value = editBtn.getAttribute('data-cislo-vypisu');
+                document.getElementById('stupen_vyplaceni').value = editBtn.getAttribute('data-stupen-vyplaceni');
 
                 // Načtení detailů smlouvy
-                loadSmlouvaDetails(button.getAttribute('data-smlouva-id'));
+                loadSmlouvaDetails(editBtn.getAttribute('data-smlouva-id'));
 
+                // Otevření modálního okna
                 modal.classList.remove('hidden');
+                return;
             }
 
-            // Mazání
-            if (e.target.closest('.delete-btn')) {
-                const link = e.target.closest('.delete-btn');
-                const confirmMessage = link.getAttribute('data-confirm');
+            // ---- MAZÁNÍ ----
+            const deleteLink = e.target.closest('.delete-btn');
+            if (deleteLink) {
+                const confirmMessage = deleteLink.getAttribute('data-confirm') || 'Opravdu chcete smazat tuto provizi?';
                 if (!confirm(confirmMessage)) {
                     e.preventDefault();
                 }
@@ -623,6 +650,21 @@ $count_results = $result_provize->num_rows;
         smlouvaSelect.addEventListener('change', function() {
             loadSmlouvaDetails(this.value);
         });
+
+
+        // Event listener pro kliknutí na řádek smlouvy
+        const tableContainer = document.getElementById('commissions-table-container');
+        if (tableContainer) {
+            tableContainer.addEventListener('click', function(e) {
+                const row = e.target.closest('.contract-row');
+                // ✅ Tato podmínka zabrání otevření modálu při kliknutí na odkaz nebo tlačítko
+                if (row && !e.target.closest('a') && !e.target.closest('button')) {
+                    const smlouvaId = row.getAttribute('data-smlouva-id');
+                    openContractCommissionsModal(smlouvaId);
+                }
+            });
+        }
+
     });
 </script>
 
